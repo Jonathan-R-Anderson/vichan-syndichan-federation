@@ -1981,6 +1981,9 @@
 		'enabled'=> false,
 		// NNTP server
 		'server' => "localhost:1119",
+		// Socket timeout (seconds) when broadcasting to the NNTP server. Federation is
+		// best-effort: an unreachable/slow peer is logged and never breaks local posting.
+		'timeout' => 5,
 		/*
 		 * Global dispatch array. Add your boards to it to enable them. Please make
 		 * sure that this setting is set in a global context.

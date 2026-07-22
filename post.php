@@ -271,7 +271,8 @@ if (isset($_GET['Newsgroups']) && $config['nntpchan']['enabled']) {
 
 	$date = isset($_GET['Date']) ? strtotime($_GET['Date']) : time();
 
-	list($ct) = explode('; ', $_GET['Content-Type']);
+	$content_type = isset($_GET['Content-Type']) ? $_GET['Content-Type'] : 'text/plain';
+	list($ct) = explode('; ', $content_type);
 
 	$query = prepare("SELECT COUNT(*) AS `c` FROM ``nntp_references`` WHERE `message_id` = :msgid");
 	$query->bindValue(":msgid", $msgid);
@@ -319,15 +320,14 @@ if (isset($_GET['Newsgroups']) && $config['nntpchan']['enabled']) {
 	$_POST['board'] = $xboard;
 
 	if (isset ($_GET['From'])) {
-		list($name, $mail) = explode(" <", $_GET['From'], 2);
-		$mail = preg_replace('/>\s+$/', '', $mail);
-
-		$_POST['name'] = $name;
-		//$_POST['email'] = $mail;
+		// "Display Name <addr@host>" — keep the display name, discard the address.
+		$from_parts = explode(" <", $_GET['From'], 2);
+		$_POST['name'] = $from_parts[0];
 		$_POST['email'] = '';
 	}
 
-	if (isset ($_GET['X_Sage'])) {
+	// PHP keeps the hyphen in GET keys, but accept the underscore form too for safety.
+	if (isset($_GET['X-Sage']) || isset($_GET['X_Sage'])) {
 		$_POST['email'] = 'sage';
 	}
 
@@ -1319,22 +1319,28 @@ if (isset($_POST['delete'])) {
 		require_once('inc/nntpchan/nntpchan.php');
 		$msgid = gen_msgid($post['board'], $post['id']);
 
-		list($headers, $files) = post2nntp($post, $msgid);
+		$built = post2nntp($post, $msgid);
 
-		$message = gen_nntp($headers, $files);
+		// post2nntp() returns false when the post cannot be federated (e.g. a reply whose
+		// thread we never federated); in that case federation is simply skipped.
+		if ($built !== false) {
+			list($headers, $files) = $built;
+			$message = gen_nntp($headers, $files);
 
-		$query = prepare("INSERT INTO ``nntp_references`` (`board`, `id`, `message_id`, `message_id_digest`, `own`, `headers`) VALUES ".
-			"(:board , :id , :message_id , :message_id_digest , true , :headers)");
+			$query = prepare("INSERT INTO ``nntp_references`` (`board`, `id`, `message_id`, `message_id_digest`, `own`, `headers`) VALUES ".
+				"(:board , :id , :message_id , :message_id_digest , true , :headers)");
 
-		$query->bindValue(':board', $post['board']);
-		$query->bindValue(':id', $post['id']);
-		$query->bindValue(':message_id', $msgid);
-		$query->bindValue(':message_id_digest', sha1($msgid));
-		$query->bindValue(':headers', json_encode($headers));
-		$query->execute() or error(db_error($query));
+			$query->bindValue(':board', $post['board']);
+			$query->bindValue(':id', $post['id']);
+			$query->bindValue(':message_id', $msgid);
+			$query->bindValue(':message_id_digest', sha1($msgid));
+			$query->bindValue(':headers', json_encode($headers));
+			$query->execute() or error(db_error($query));
 
-		// Let's broadcast it!
-		nntp_publish($message, $msgid);
+			// Broadcast after the response is flushed (below), so a slow or unreachable
+			// peer can never delay or break the poster's request.
+			$nntp_broadcast = array('message' => $message, 'id' => $msgid);
+		}
 	}
 
 	insertFloodPost($post);
@@ -1446,6 +1452,11 @@ if (isset($_POST['delete'])) {
 		Vichan\Functions\Theme\rebuild_themes('post-thread', $board['uri']);
 	else
 		Vichan\Functions\Theme\rebuild_themes('post', $board['uri']);
+
+	// Federate to NNTPChan peers now that the poster has already got their response.
+	if (isset($nntp_broadcast)) {
+		nntp_publish($nntp_broadcast['message'], $nntp_broadcast['id']);
+	}
 
 } elseif (isset($_POST['appeal'])) {
 	if (!isset($_POST['ban_id']))
