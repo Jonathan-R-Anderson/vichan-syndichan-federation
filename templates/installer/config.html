@@ -1,0 +1,177 @@
+<form action="?step=3" method="post" autocomplete="off">
+	<fieldset>
+	<legend>Database (MySQL)</legend>
+		<label for="db_server">Server:</label> 
+		<input type="text" id="db_server" name="db[server]" value="{{ config.db.server }}">
+
+		<label for="db_db">Database:</label> 
+		<input type="text" id="db_db" name="db[database]" value="{{ config.db.database }}">
+
+		<label for="db_prefix">Table prefix (optional):</label> 
+		<input type="text" id="db_prefix" name="db[prefix]" value="{{ config.db.prefix }}">
+
+		<label for="db_user">Username:</label> 
+		<input type="text" id="db_user" name="db[user]" value="{{ config.db.user }}">
+
+		<label for="db_pass">Password:</label> 
+		<input type="password" id="db_pass" name="db[password]" value="{{ config.db.password }}">
+	<legend>Cookies</legend>
+		<label for="cookies_mod">Moderator cookie:</label> 
+		<input type="text" id="cookies_mod" name="cookies[mod]" value="{{ config.cookies.mod }}">
+
+		<label for="cookies_salt">Secure salt:</label> 
+		<input type="text" id="cookies_salt" name="cookies[salt]" value="{{ config.cookies.salt }}" size="40">
+	</fieldset>
+
+	<fieldset>
+	<legend>Flood control</legend>
+		<label for="flood_time">Seconds before each post:</label> 
+		<input type="text" id="flood_time" name="flood_time" value="{{ config.flood_time }}">
+
+		<label for="flood_time_ip">Seconds before you can repost something (post the exact same text):</label> 
+		<input type="text" id="flood_time_ip" name="flood_time_ip" value="{{ config.flood_time_ip }}">
+
+		<label for="flood_time_same">Same as above, but with a different IP address:</label> 
+		<input type="text" id="flood_time_same" name="flood_time_same" value="{{ config.flood_time_same }}">
+
+		<label for="max_body">Maximum post body length:</label> 
+		<input type="text" id="max_body" name="max_body" value="{{ config.max_body }}">
+
+		<label for="reply_limit">Replies in a thread before it can no longer be bumped:</label> 
+		<input type="text" id="reply_limit" name="reply_limit" value="{{ config.reply_limit }}">
+
+		<label for="max_links">Maximum number of links in a single post:</label> 
+		<input type="text" id="max_links" name="max_links" value="{{ config.max_links }}">			
+	</fieldset>
+
+	<fieldset>
+	<legend>Images</legend>
+		<label for="max_filesize">Maximum image filesize (bytes):</label> 
+		<input type="text" id="max_filesize" name="max_filesize" value="{{ config.max_filesize }}">
+		<div class="expandable">
+			<legend>PHP File Size Limit</legend>
+			<div class="body">
+				<p>Configure the PHP file size limit in the <code>php.ini</code> file. If it doesn't exist, create one.</p>
+				<div class="expandable">
+					<legend>Using Docker</legend>
+					<div class="body">
+						<p>Edit or create <code>./vichan/docker/php/php.ini</code> in the project root.</p>
+						<p>To set the limit to 10MB, add:</p>
+						<pre>
+		upload_max_filesize = 10M
+		post_max_size = 10M
+						</pre>
+						<p>Then restart the containers.</p>
+					</div>
+				</div>
+				<div class="expandable">
+					<legend>Manual Configuration</legend>
+					<div class="body">
+						<p>Edit or create <code>/usr/local/etc/php/php.ini</code>.</p>
+						<p>To set the limit to 10MB, add:</p>
+						<pre>
+		upload_max_filesize = 10M
+		post_max_size = 10M
+						</pre>
+						<p>Then restart the PHP server.</p>
+					</div>
+				</div>
+				<hr>
+				<p>Default limit is 2MB if not set.</p>
+			</div>
+		</div>
+		<label for="thumb_width">Thumbnail width:</label> 
+		<input type="text" id="thumb_width" name="thumb_width" value="{{ config.thumb_width }}">
+
+		<label for="thumb_height">Thumbnail height:</label> 
+		<input type="text" id="thumb_height" name="thumb_height" value="{{ config.thumb_height }}">
+
+		<label for="max_width">Maximum image width:</label> 
+		<input type="text" id="max_width" name="max_width" value="{{ config.max_width }}">
+
+		<label for="max_height">Maximum image height:</label> 
+		<input type="text" id="max_height" name="max_height" value="{{ config.max_height }}">
+	</fieldset>
+
+	<fieldset>
+	<legend>Display</legend>
+		<label for="threads_per_page">Threads per page:</label> 
+		<input type="text" id="threads_per_page" name="threads_per_page" value="{{ config.threads_per_page }}">
+
+		<label for="max_pages">Page limit:</label> 
+		<input type="text" id="max_pages" name="max_pages" value="{{ config.max_pages }}">
+
+		<label for="threads_preview">Number of replies to show per thread on the index page:</label> 
+		<input type="text" id="threads_preview" name="threads_preview" value="{{ config.threads_preview }}">
+	</fieldset>
+
+	<fieldset>
+	<legend>Directories</legend>
+		<label for="root">Root URI (include trailing slash):</label> 
+		<input type="text" id="root" name="root" value="{{ config.root }}" size="40">
+	</fieldset>
+
+	<fieldset>
+	<legend>Miscellaneous</legend>
+		<label for="secure_trip_salt">Secure trip (##) salt:</label> 
+		<input type="text" id="secure_trip_salt" name="secure_trip_salt" value="{{ config.secure_trip_salt }}" size="40">
+
+		<label for="secure_password_salt">Poster password salt:</label>
+		<input type="text" id="secure_password_salt" name="secure_password_salt" value="{{ config.secure_password_salt }}" size="40">
+
+		<label for="more">Additional configuration:</label>
+		<textarea id="more" name="more">{{ more }}</textarea>
+	</fieldset>
+
+	<p style="text-align:center">
+		<input type="submit" value="Complete installation">
+	</p>
+</form>
+<script>
+	const expandables = document.querySelectorAll('.expandable');
+	expandables.forEach(expandable => {
+		const arrow = document.createElement('span');
+		arrow.innerHTML = ' &#9654;'; // Right arrow
+		arrow.style.cursor = 'pointer';
+		arrow.style.marginLeft = '5px';
+		expandable.querySelector('legend').appendChild(arrow);
+		expandable.querySelector('legend').style.cursor = 'pointer';
+		expandable.querySelector('legend').style.fontWeight = 'bold';
+		expandable.querySelector('legend').style.display = 'flex';
+		expandable.querySelector('legend').style.alignItems = 'center';
+		expandable.querySelector('legend').style.justifyContent = 'space-between';
+		
+
+		const label = expandable.querySelector('legend');
+		const body = expandable.querySelector('.body');
+		label.addEventListener('click', () => {
+			if (body.style.display === 'none' || body.style.display === '') {
+				body.style.display = 'block';
+				arrow.innerHTML = ' &#9660;'; // Down arrow
+			} else {
+				body.style.display = 'none';
+				arrow.innerHTML = ' &#9654;'; // Up arrow
+			}
+		});
+	});
+</script>
+
+<style>
+	.expandable {
+		border: 1px solid #ccc;
+		padding: 10px;
+		margin: 10px 0;
+	}
+	.expandable legend {
+		cursor: pointer;
+		font-weight: bold;
+	}
+	.expandable fieldset {
+		border: none;
+		padding: 0;
+		margin: 0;
+	}
+	.expandable .body {
+		display: none; /* Ensure the body is hidden initially */
+	}
+</style>
