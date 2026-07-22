@@ -1,0 +1,71 @@
+<p class="unimportant" style="text-align:center;word-wrap:break-word">
+	{% if enabled %}
+		{% trans 'Image hash checking is enabled.' %}
+	{% else %}
+		<strong>{% trans 'Image hash checking is disabled.' %}</strong>
+		{% trans 'Set $config[\'image_hash\'][\'enabled\'] = true; to enforce this blacklist.' %}
+	{% endif %}
+	{% trans 'Default algorithm:' %} <code>{{ algo|e }}</code>.
+	{% trans 'Match threshold (max Hamming distance):' %} <code>{{ threshold }}</code>.
+</p>
+
+<fieldset>
+	<legend>{% trans 'Ban images' %}</legend>
+	<form style="margin:0" action="?/image-hashes" method="post" enctype="multipart/form-data">
+		<input type="hidden" name="token" value="{{ token }}">
+		<table>
+			<tr>
+				<th><label for="images">{% trans 'Upload image(s)' %}</label></th>
+				<td>
+					<input type="file" name="images[]" id="images" multiple accept="image/*">
+					<div class="unimportant">{% trans 'Their perceptual hash is computed and added to the blacklist.' %}</div>
+				</td>
+			</tr>
+			<tr>
+				<th><label for="hashes">{% trans 'Import hashes' %}</label></th>
+				<td>
+					<textarea name="hashes" id="hashes" style="width:100%;height:120px" placeholder="one per line: [algo:]hash[:note]&#10;e.g.&#10;a1b2c3d4e5f60718&#10;phash:00ffee11aabb2233&#10;md5:d41d8cd98f00b204e9800998ecf8427e:known spam"></textarea>
+					<div class="unimportant">
+						{% trans 'One entry per line, formatted' %} <code>[algo:]hash[:note]</code>.
+						{% trans 'Bare hashes use the default algorithm above. Supported algorithms:' %}
+						{% for a in algos %}<code>{{ a }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.
+					</div>
+				</td>
+			</tr>
+			<tr>
+				<th><label for="note">{% trans 'Note' %}</label></th>
+				<td><input type="text" size="55" name="note" id="note" placeholder="{% trans 'optional, applied to entries added above' %}"></td>
+			</tr>
+		</table>
+		<p style="text-align:center">
+			<input type="submit" value="{% trans 'Add to blacklist' %}">
+		</p>
+	</form>
+</fieldset>
+
+<table class="mod" style="width:100%">
+	<tr>
+		<th>{% trans 'Algorithm' %}</th>
+		<th>{% trans 'Hash' %}</th>
+		<th>{% trans 'Bits' %}</th>
+		<th>{% trans 'Note' %}</th>
+		<th>{% trans 'Added' %}</th>
+		<th></th>
+	</tr>
+	{% for h in hashes %}
+		<tr>
+			<td><code>{{ h.algo|e }}</code></td>
+			<td><code>{{ h.hash|e }}</code></td>
+			<td>{{ h.bits }}</td>
+			<td>{{ h.note|e }}</td>
+			<td>{{ h.created|date(config.post_date) }}</td>
+			<td>
+				<a class="unimportant" href="?/image-hashes/delete/{{ h.id }}/{{ h.delete_token }}">[{% trans 'delete' %}]</a>
+			</td>
+		</tr>
+	{% else %}
+		<tr>
+			<td colspan="6" style="text-align:center">{% trans 'No image hashes blacklisted yet.' %}</td>
+		</tr>
+	{% endfor %}
+</table>

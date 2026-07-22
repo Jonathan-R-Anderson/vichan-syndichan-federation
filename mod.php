@@ -59,6 +59,9 @@ $pages = [
 	'/boardlinks'				=> 'secure_POST boardlinks',	// manage navigation boardlinks
 	'/boardlinks/delete/(\d+)'		=> 'secure boardlinks_delete',	// delete a boardlink
 
+	'/image-hashes'				=> 'secure_POST image_hashes',	// manage image hash blacklist
+	'/image-hashes/delete/(\d+)'		=> 'secure image_hashes_delete',	// delete an image hash ban
+
 	'/edit/(\%b)'				=> 'secure_POST edit_board',	// edit board details
 	'/new-board'				=> 'secure_POST new_board',	// create a new board
 

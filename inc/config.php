@@ -287,6 +287,22 @@
 	//);
 	$config['simple_spam'] = false;
 
+	/*
+	 * Perceptual image-hash blacklist. Unlike an exact file hash, a perceptual hash barely
+	 * changes when the image barely changes, so a re-encoded/resized/one-pixel-edited copy
+	 * of a banned image is still caught. Blacklisted hashes are managed from the mod panel
+	 * (?/image-hashes) and stored in the `image_hashes` table.
+	 */
+	$config['image_hash'] = [
+		// Master switch for checking uploads against the blacklist.
+		'enabled' => false,
+		// Algorithm used when banning an uploaded image: 'phash' (most robust), 'dhash' or 'ahash'.
+		'algo' => 'phash',
+		// Maximum Hamming distance (out of 64 bits) still considered a match. Lower = stricter.
+		// ~0-4 = almost identical, ~8-10 = visually the same image, >16 = likely different.
+		'threshold' => 8,
+	];
+
 	$config['captcha'] = [
 		// Can be false, 'recaptcha', 'hcaptcha', 'native' or 'anime'.
 		// - 'native' is the self-hosted distorted-text captcha.
@@ -1274,6 +1290,7 @@
 		'invalidimg'			=> _('Invalid image.'),
 		'phpfileserror'			=> _('Upload failure (file #%index%): Error code %code%. Refer to <a href=>"http://php.net/manual/en/features.file-upload.errors.php">http://php.net/manual/en/features.file-upload.errors.php</a>; post discarded.'),
 		'unknownext'			=> _('Unknown file extension.'),
+		'image_hash_banned'		=> _('This image (or one too similar to it) has been banned from being posted here.'),
 		'filesize'				=> _('Maximum file size: %maxsz% bytes<br>Your file\'s size: %filesz% bytes'),
 		'maxsize'				=> _('The file was too big.'),
 		'genwebmerror'			=> _('There was a problem processing your webm.'),
@@ -1379,6 +1396,7 @@
 	$config['file_mod_noticeboard'] = 'mod/noticeboard.html';
 	$config['file_mod_captcha'] = 'mod/captcha.html';
 	$config['file_mod_boardlinks'] = 'mod/boardlinks.html';
+	$config['file_mod_image_hashes'] = 'mod/image_hashes.html';
 	$config['file_mod_search_results'] = 'mod/search_results.html';
 
 	$config['file_mod_move'] = 'mod/move.html';
@@ -1831,6 +1849,8 @@
 	$config['mod']['manage_captcha'] = ADMIN;
 	// Manage the navigation boardlinks bar (?/boardlinks)
 	$config['mod']['edit_boardlinks'] = ADMIN;
+	// Manage the perceptual image-hash blacklist (?/image-hashes)
+	$config['mod']['manage_image_hashes'] = ADMIN;
 
 	// Config editor permissions
 	$config['mod']['config'] = array();

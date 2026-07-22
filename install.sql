@@ -390,6 +390,29 @@ CREATE TABLE IF NOT EXISTS `boardlinks` (
   KEY `position` (`position`)
 ) ENGINE=InnoDB  DEFAULT CHARSET=utf8mb4;
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `image_hashes`
+--
+-- Blacklist of image hashes. Perceptual hashes (phash/dhash/ahash) are matched by Hamming
+-- distance so near-duplicate images are caught; exact hashes (md5/sha1/sha256) match only
+-- identical files. Each row records the algorithm so hashes from any tool can be imported.
+-- Managed from the mod panel (?/image-hashes).
+--
+
+CREATE TABLE IF NOT EXISTS `image_hashes` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `algo` VARCHAR(16) NOT NULL DEFAULT 'phash',
+  `hash` VARCHAR(64) NOT NULL,
+  `bits` SMALLINT(6) NOT NULL DEFAULT 0,
+  `note` VARCHAR(255) NOT NULL DEFAULT '',
+  `created` INT(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `algo_hash` (`algo`,`hash`),
+  KEY `algo` (`algo`)
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8mb4;
+
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

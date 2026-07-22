@@ -73,6 +73,9 @@
 		{% if mod|hasPermission(config.mod.edit_boardlinks) %}
 			<li><a href="?/boardlinks">{% trans 'Boardlinks' %}</a></li>
 		{% endif %}
+		{% if mod|hasPermission(config.mod.manage_image_hashes) %}
+			<li><a href="?/image-hashes">{% trans 'Image hash bans' %}</a></li>
+		{% endif %}
 		<li>
 			<a href="?/inbox">
 				{% trans 'PM inbox' %}

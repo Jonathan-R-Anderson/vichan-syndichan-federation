@@ -1052,6 +1052,20 @@ if (isset($_POST['delete'])) {
 		}
 	}
 
+	// Reject images that match the perceptual/exact image-hash blacklist.
+	if ($post['has_file'] && !empty($config['image_hash']['enabled'])
+		&& !hasPermission($config['mod']['bypass_filters'], $board['uri']) && !$dropped_post) {
+		require_once 'inc/image-hash.php';
+		foreach ($post['files'] as $img_file) {
+			if (empty($img_file['is_an_image'])) {
+				continue;
+			}
+			if (image_hash_find_match($config, $img_file['tmp_name']) !== null) {
+				error($config['error']['image_hash_banned']);
+			}
+		}
+	}
+
 	if (!hasPermission($config['mod']['bypass_filters'], $board['uri']) && !$dropped_post) {
 		require_once 'inc/filters.php';
 

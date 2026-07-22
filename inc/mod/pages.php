@@ -788,6 +788,101 @@ function mod_boardlinks_delete(Context $ctx, $id) {
 	header('Location: ?/boardlinks', true, $config['redirect_http']);
 }
 
+function mod_image_hashes(Context $ctx) {
+	global $mod;
+	$config = $ctx->get('config');
+
+	if (!hasPermission($config['mod']['manage_image_hashes']))
+		error($config['error']['noaccess']);
+
+	require_once 'inc/image-hash.php';
+
+	if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+		$note = isset($_POST['note']) ? trim($_POST['note']) : '';
+		$added = 0;
+
+		// (a) Ban uploaded image(s): compute the configured perceptual hash of each.
+		if (isset($_FILES['images']) && is_array($_FILES['images']['tmp_name'])) {
+			$algo = $config['image_hash']['algo'];
+			foreach ($_FILES['images']['tmp_name'] as $i => $tmp) {
+				if ($tmp === '' || !isset($_FILES['images']['error'][$i]) || $_FILES['images']['error'][$i] !== UPLOAD_ERR_OK)
+					continue;
+				if (!is_uploaded_file($tmp))
+					continue;
+				$computed = image_hash_compute_file($algo, $tmp);
+				if ($computed === null)
+					continue;
+				if (image_hash_insert($algo, $computed, $note))
+					$added++;
+			}
+		}
+
+		// (b) Bulk import: one entry per line, formatted "[algo:]hash[:note]".
+		if (isset($_POST['hashes']) && trim($_POST['hashes']) !== '') {
+			$default_algo = $config['image_hash']['algo'];
+			foreach (preg_split('/\r\n|\r|\n/', $_POST['hashes']) as $line) {
+				$line = trim($line);
+				if ($line === '')
+					continue;
+				$parts = explode(':', $line, 3);
+				if (count($parts) === 1) {
+					$algo = $default_algo;
+					$hash = $parts[0];
+					$line_note = $note;
+				} else {
+					$algo = trim($parts[0]);
+					$hash = trim($parts[1]);
+					$line_note = (isset($parts[2]) && trim($parts[2]) !== '') ? trim($parts[2]) : $note;
+				}
+				if (image_hash_insert($algo, $hash, $line_note))
+					$added++;
+			}
+		}
+
+		modLog("Added $added image hash ban(s)");
+
+		header('Location: ?/image-hashes', true, $config['redirect_http']);
+		return;
+	}
+
+	$query = query("SELECT * FROM ``image_hashes`` ORDER BY `id` DESC") or error(db_error());
+	$hashes = $query->fetchAll(PDO::FETCH_ASSOC);
+
+	foreach ($hashes as &$entry) {
+		$entry['delete_token'] = make_secure_link_token('image-hashes/delete/' . $entry['id']);
+	}
+	unset($entry);
+
+	mod_page(
+		_('Image hash bans'),
+		$config['file_mod_image_hashes'],
+		[
+			'hashes' => $hashes,
+			'algos' => array_keys(image_hash_algos()),
+			'algo' => $config['image_hash']['algo'],
+			'threshold' => $config['image_hash']['threshold'],
+			'enabled' => !empty($config['image_hash']['enabled']),
+			'token' => make_secure_link_token('image-hashes')
+		],
+		$mod
+	);
+}
+
+function mod_image_hashes_delete(Context $ctx, $id) {
+	$config = $ctx->get('config');
+
+	if (!hasPermission($config['mod']['manage_image_hashes']))
+		error($config['error']['noaccess']);
+
+	$query = prepare("DELETE FROM ``image_hashes`` WHERE `id` = :id");
+	$query->bindValue(':id', $id);
+	$query->execute() or error(db_error($query));
+
+	modLog('Deleted an image hash ban');
+
+	header('Location: ?/image-hashes', true, $config['redirect_http']);
+}
+
 function mod_news(Context $ctx, $page_no = 1) {
 	global $pdo, $mod;
 	$config = $ctx->get('config');
