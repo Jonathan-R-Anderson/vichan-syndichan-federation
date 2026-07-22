@@ -1294,10 +1294,25 @@ function mod_bans_json(Context $ctx) {
 	if (!hasPermission($config['mod']['ban']))
 		error($config['error']['noaccess']);
 
-	// Compress the json for faster loads
-	if (substr_count($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip')) ob_start("ob_gzhandler");
+	// This endpoint takes pagination GET params, which do not combine with the router's
+	// path-appended CSRF token, so the token is passed and checked here instead.
+	$token = isset($_GET['token']) ? (string)$_GET['token'] : '';
+	if (!hash_equals(make_secure_link_token('bans.json'), $token))
+		error($config['error']['csrf']);
 
-	Bans::stream_json(false, false, !hasPermission($config['mod']['view_banstaff']), $mod['boards']);
+	// Infinite-scroll window.
+	$offset = (isset($_GET['offset']) && ctype_digit((string)$_GET['offset'])) ? (int)$_GET['offset'] : 0;
+	$limit  = (isset($_GET['limit'])  && ctype_digit((string)$_GET['limit']))  ? (int)$_GET['limit']  : (int)$config['mod']['bans_json_limit'];
+	if ($limit < 1)
+		$limit = 1;
+	if ($limit > $config['mod']['bans_json_max_limit'])
+		$limit = (int)$config['mod']['bans_json_max_limit'];
+
+	// Compress the json for faster loads
+	if (isset($_SERVER['HTTP_ACCEPT_ENCODING']) && substr_count($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip')) ob_start("ob_gzhandler");
+
+	header('Content-Type: application/json');
+	Bans::stream_json(false, false, !hasPermission($config['mod']['view_banstaff']), $mod['boards'], $offset, $limit);
 }
 
 function mod_ban_appeals(Context $ctx) {

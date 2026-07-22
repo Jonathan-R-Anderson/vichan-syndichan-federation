@@ -138,6 +138,16 @@ $.fn.longtable = function(fields, options, data) {
       return data;
     },
 
+    // Append more rows (used by the ban list's infinite scroll) and re-render,
+    // preserving the active filter and sort.
+    add_data: function(rows) {
+      if (!rows || !rows.length) return;
+      orig_data = orig_data.concat(rows);
+      lt._reset_data();
+      lt._apply_filter();
+      lt._sort_by();
+    },
+
     destroy: function() {
     },
 

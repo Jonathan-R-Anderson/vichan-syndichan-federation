@@ -1559,6 +1559,10 @@
 		'modlog_page' => 350,
 		// Number of bans to show per page in the ban list.
 		'banlist_page'=> 350,
+		// Number of bans fetched per request by the ban list's infinite scroll (?/bans.json).
+		'bans_json_limit' => 250,
+		// Hard cap on how many bans a single ?/bans.json request may return.
+		'bans_json_max_limit' => 1000,
 		// Number of news entries to display per page.
 		'news_page' => 40,
 		// Number of results to display per page.

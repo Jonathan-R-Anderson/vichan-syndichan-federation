@@ -286,62 +286,102 @@ class Bans {
 		}
 	}
 
-	static public function stream_json($out = false, $filter_ips = false, $filter_staff = false, $board_access = false) {
-		$query = query("SELECT ``bans``.*, `username` FROM ``bans``
-			LEFT JOIN ``mods`` ON ``mods``.`id` = `creator`
- 			ORDER BY `created` DESC") or error(db_error());
-                $bans = $query->fetchAll(PDO::FETCH_ASSOC);
+	/**
+	 * Stream the ban list as a JSON array, fetched in bounded batches so a huge ban
+	 * table never has to be loaded into memory (or serialised) all at once.
+	 *
+	 * @param resource|false $out          Stream to write to, or false to echo.
+	 * @param bool           $filter_ips   Blank out the tail of each IP.
+	 * @param bool           $filter_staff Hide the banning staff member.
+	 * @param array|false    $board_access Boards the viewer moderates ('*' or false = all).
+	 * @param int            $offset       Row offset to start at (for infinite scroll).
+	 * @param int|null       $limit        Max rows to emit; null streams the whole table
+	 *                                     (still paged internally to bound memory).
+	 */
+	static public function stream_json($out = false, $filter_ips = false, $filter_staff = false, $board_access = false, $offset = 0, $limit = null) {
+		$emit = function($str) use ($out) {
+			$out ? fputs($out, $str) : print($str);
+		};
 
 		if ($board_access && $board_access[0] == '*') $board_access = false;
 
-		$out ? fputs($out, "[") : print("[");
+		// Never hold more than one batch of rows in memory at a time.
+		$batch_size = 1000;
+		$cursor = max(0, (int)$offset);
+		$remaining = ($limit === null) ? null : max(0, (int)$limit);
 
-		$end = end($bans);
+		$emit("[");
 
-		foreach ($bans as &$ban) {
-			$uncloaked_mask = self::range_to_string([$ban['ipstart'], $ban['ipend']]);
-			$ban['mask'] = $uncloaked_mask;
+		$first = true;
 
-			if ($ban['post']) {
-				$post = json_decode($ban['post']);
-				$ban['message'] = isset($post->body) ? $post->body : 0;
-			}
-			unset($ban['ipstart'], $ban['ipend'], $ban['post'], $ban['creator']);
+		while ($remaining === null || $remaining > 0) {
+			$take = ($remaining === null) ? $batch_size : min($batch_size, $remaining);
 
-			if ($board_access === false || in_array ($ban['board'], $board_access)) {
-				$ban['access'] = true;
-			}
+			// $take/$cursor are integers here, so they are inlined safely (binding LIMIT
+			// is unreliable across PDO emulation settings).
+			$query = query("SELECT ``bans``.*, `username` FROM ``bans``
+				LEFT JOIN ``mods`` ON ``mods``.`id` = `creator`
+				ORDER BY `created` DESC, ``bans``.`id` DESC
+				LIMIT " . (int)$take . " OFFSET " . (int)$cursor) or error(db_error());
 
-			if (filter_var($uncloaked_mask, FILTER_VALIDATE_IP) !== false) {
-				$ban['single_addr'] = true;
-			}
-			if ($filter_staff || ($board_access !== false && !in_array($ban['board'], $board_access))) {
-				$ban['username'] = '?';
-			}
-			if ($filter_ips || ($board_access !== false && !in_array($ban['board'], $board_access))) {
-				@list($ban['mask'], $subnet) = explode("/", $ban['mask']);
-				$ban['mask'] = preg_split("/[\.:]/", $ban['mask']);
-				$ban['mask'] = array_slice($ban['mask'], 0, 2);
-				$ban['mask'] = implode(".", $ban['mask']);
-				$ban['mask'] .= ".x.x";
-				if (isset ($subnet)) {
-					$ban['mask'] .= "/$subnet";
+			$rows = 0;
+			while ($ban = $query->fetch(PDO::FETCH_ASSOC)) {
+				$rows++;
+
+				$uncloaked_mask = self::range_to_string([$ban['ipstart'], $ban['ipend']]);
+				$ban['mask'] = $uncloaked_mask;
+
+				if ($ban['post']) {
+					$post = json_decode($ban['post']);
+					$ban['message'] = isset($post->body) ? $post->body : 0;
 				}
-				$ban['masked'] = true;
-			} else {
-				$ban['mask'] = cloak_mask($ban['mask']);
+				unset($ban['ipstart'], $ban['ipend'], $ban['post'], $ban['creator']);
+
+				if ($board_access === false || in_array($ban['board'], $board_access)) {
+					$ban['access'] = true;
+				}
+
+				if (filter_var($uncloaked_mask, FILTER_VALIDATE_IP) !== false) {
+					$ban['single_addr'] = true;
+				}
+				if ($filter_staff || ($board_access !== false && !in_array($ban['board'], $board_access))) {
+					$ban['username'] = '?';
+				}
+				if ($filter_ips || ($board_access !== false && !in_array($ban['board'], $board_access))) {
+					@list($ban['mask'], $subnet) = explode("/", $ban['mask']);
+					$ban['mask'] = preg_split("/[\.:]/", $ban['mask']);
+					$ban['mask'] = array_slice($ban['mask'], 0, 2);
+					$ban['mask'] = implode(".", $ban['mask']);
+					$ban['mask'] .= ".x.x";
+					if (isset($subnet)) {
+						$ban['mask'] .= "/$subnet";
+					}
+					$ban['masked'] = true;
+				} else {
+					$ban['mask'] = cloak_mask($ban['mask']);
+				}
+
+				if (!$first) {
+					$emit(",");
+				}
+				$first = false;
+				$emit(json_encode($ban));
+
+				unset($subnet);
 			}
 
-			$json = json_encode($ban);
-			$out ? fputs($out, $json) : print($json);
+			$cursor += $rows;
+			if ($remaining !== null) {
+				$remaining -= $rows;
+			}
 
-			if ($ban['id'] != $end['id']) {
-				$out ? fputs($out, ",") : print(",");
+			// A short batch means the table is exhausted.
+			if ($rows < $take) {
+				break;
 			}
 		}
 
-		$out ? fputs($out, "]") : print("]");
-
+		$emit("]");
 	}
 
 	static public function seen($ban_id) {
