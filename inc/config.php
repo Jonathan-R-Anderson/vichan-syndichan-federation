@@ -1960,10 +1960,11 @@
 	// https://github.com/4chan/4chan-API for API specification.
 	$config['api']['enabled'] = true;
 
-	// Extra fields in to be shown in the array that are not in the 4chan-API. You can get these by taking a
+	// Extra fields to be shown in the array that are not in the 4chan-API. You can get these by taking a
 	// look at the schema for posts_ tables. The array should be formatted as $db_column => $translated_name.
-	// Example: Adding the pre-markup post body to the API as "com_nomarkup".
-	// $config['api']['extra_fields'] = array('body_nomarkup' => 'com_nomarkup');
+	// Uncomment the line below to add the raw, pre-markup post body to the API as "com_nomarkup"
+	// (useful for archival software that needs the original markdown/markup).
+	$config['api']['extra_fields'] = array('body_nomarkup' => 'com_nomarkup');
 
 /*
  * ==================

@@ -46,6 +46,8 @@ class Api {
 	];
 
 	public function __construct(bool $show_filename, bool $hide_email, bool $country_flags) {
+		global $config;
+
 		// Translation from local fields to fields in 4chan-style API
 		$this->show_filename = $show_filename;
 		$this->hide_email = $hide_email;
@@ -94,7 +96,44 @@ class Api {
 		}
 	}
 
+	private static function extensionOf($filename) {
+		$dotPos = strrpos((string) $filename, '.');
+		return $dotPos === false ? '' : substr($filename, $dotPos);
+	}
+
+	/**
+	 * Expose spoiler state and the thumbnail extension / custom thumbnail path, none of
+	 * which the 4chan-style API carried before.
+	 */
+	private function translateThumb($file, &$apiPost) {
+		global $config;
+
+		$thumb = isset($file->thumb) ? $file->thumb : null;
+
+		if ($thumb === 'spoiler') {
+			// The thumbnail is the board's spoiler image; there is no per-post thumbnail.
+			$apiPost['spoiler'] = 1;
+		} elseif ($thumb === 'file') {
+			// Non-image upload (e.g. swf, pdf) shown with a static file-type icon.
+			$ext = ltrim($apiPost['ext'] ?? '', '.');
+			$icon = $config['file_icons'][$ext] ?? ($config['file_icons']['default'] ?? null);
+			if ($icon !== null) {
+				$apiPost['custom_thumb'] = sprintf($config['file_thumb'], $icon);
+			}
+		} elseif ($thumb !== null && $thumb !== '') {
+			// Regular generated thumbnail: {tim}{tn_ext} under the thumbnail directory.
+			$apiPost['tn_ext'] = self::extensionOf($thumb);
+		}
+	}
+
 	private function translateFile($file, $post, &$apiPost) {
+		// A file whose content was removed by a moderator (its thumbnail and file are the
+		// "deleted" placeholder). Mirror 4chan and only flag it as deleted.
+		if (isset($file->file) && $file->file === 'deleted') {
+			$apiPost['filedeleted'] = 1;
+			return;
+		}
+
 		$this->translateFields(self::FILE_FIELDS, $file, $apiPost);
 		$dotPos = strrpos($file->file, '.');
 		$apiPost['ext'] = substr($file->file, $dotPos);
@@ -110,6 +149,8 @@ class Api {
 		} elseif (isset ($post->filehash) && $post->filehash) {
 			$apiPost['md5'] = base64_encode(hex2bin($post->filehash));
 		}
+
+		$this->translateThumb($file, $apiPost);
 	}
 
 	private function translatePost($post, bool $threadsPage = false) {
@@ -120,7 +161,7 @@ class Api {
 		$this->translateFields($fields, $post, $apiPost);
 
 
-		if (isset($config['poster_ids']) && $config['poster_ids']) {
+		if (isset($config['poster_ids']) && $config['poster_ids'] && isset($post->ip)) {
 			$apiPost['id'] = poster_id($post->ip, $post->thread ?? $post->id);
 		}
 		if ($threadsPage) {
@@ -210,15 +251,11 @@ class Api {
 	}
 	
 	public function translateBoard($board) {
-		$apiBoard = [];
-		
-		foreach ($boards as $board) {
-			$apiBoard['uri'] = $board['uri'];
-			$apiBoard['title'] = $board['title'];
-			$apiBoard['subtitle'] = $board['subtitle'];
-		}
-
-		return $apiBoard;
+		return [
+			'uri' => $board['uri'],
+			'title' => $board['title'],
+			'subtitle' => $board['subtitle'],
+		];
 	}
 
 	public function translateBoards($boards) {
