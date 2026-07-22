@@ -1,0 +1,31 @@
+/*
+ * reCAPTCHA layout tweaks. Extracted from an inline <style> block in header.html so a
+ * Content-Security-Policy without 'unsafe-inline' for style-src can be used.
+ */
+#recaptcha_area {
+	float: none !important;
+	padding: 0 !important;
+}
+#recaptcha_logo, #recaptcha_privacy {
+	display: none;
+}
+#recaptcha_table {
+	border: none !important;
+}
+#recaptcha_table tr:first-child {
+	height: auto;
+}
+.recaptchatable img {
+	float: none !important;
+}
+#recaptcha_response_field {
+	font-size: 10pt !important;
+	border: 1px solid #a9a9a9 !important;
+	padding: 1px !important;
+}
+td.recaptcha_image_cell {
+	background: transparent !important;
+}
+.recaptchatable, #recaptcha_area tr, #recaptcha_area td, #recaptcha_area th {
+	padding: 0 !important;
+}

@@ -3,10 +3,7 @@
 <html>
 <head>
 	<meta http-equiv="Content-type" content="text/html; charset=utf-8" />
-	<script type='text/javascript'>
-		var active_page = "catalog"
-		  , board_name = "{{ board }}";
-	</script>
+	{% set active_page = 'catalog' %}
 	{% include 'header.html' %}
 	<title>{{ board }} - Catalog</title>
 </head>
@@ -81,10 +78,6 @@
 			{% for name, uri in config.stylesheets %}{% verbatim %}'{% endverbatim %}{{ name|addslashes }}{% verbatim %}' : '{% endverbatim %}/stylesheets/{{ uri|addslashes }}{% verbatim %}',
 			{% endverbatim %}{% endfor %}{% verbatim %}
 		}; onReady(init);
-	{% endverbatim %}</script>
-
-	<script type="text/javascript">{% verbatim %}
-		ready();
 	{% endverbatim %}</script>
 </body>
 </html>

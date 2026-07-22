@@ -1,3 +1,4 @@
+{% if config.csp %}<meta http-equiv="Content-Security-Policy" content="{{ config.csp }}">{% endif %}
 <link rel="stylesheet" media="screen" href="{{ config.url_stylesheet }}?v={{ config.resource_version }}">
 {% if config.url_favicon %}<link rel="shortcut icon" href="{{ config.url_favicon }}">{% endif %}
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
@@ -6,13 +7,21 @@
 {% if config.default_stylesheet.1 != '' %}<link rel="stylesheet" type="text/css" id="stylesheet" href="{{ config.uri_stylesheets }}{{ config.default_stylesheet.1 }}?v={{ config.resource_version }}">{% endif %}
 {% if config.font_awesome %}<link rel="stylesheet" href="{{ config.root }}{{ config.font_awesome_css }}?v={{ config.resource_version }}">{% endif %}
 {% if config.country_flags_condensed %}<link rel="stylesheet" href="{{ config.root }}{{ config.country_flags_condensed_css }}?v={{ config.resource_version }}">{% endif %}
-<script type="text/javascript">
-	var configRoot="{{ config.root }}";
-	var inMod = {% if mod %} true {% else %} false {% endif %};
-	var modRoot = "{{ config.root }}" + (inMod ? "mod.php?/" : "");
-</script>
 {% if not nojavascript %}
-	<script type="text/javascript" src="{{ config.url_javascript }}?v={{ config.resource_version }} data-resource-version="{{ config.resource_version }}"></script>
+	{#
+	   CSP-friendly bootstrap: page context (which board/page we are on, mod state, roots)
+	   is passed to main.js via these data-* attributes instead of an inline <script>.
+	   main.js reads them from document.currentScript.
+	#}
+	<script type="text/javascript"
+		src="{{ config.url_javascript }}?v={{ config.resource_version }}"
+		data-resource-version="{{ config.resource_version }}"
+		data-config-root="{{ config.root }}"
+		data-in-mod="{% if mod %}true{% else %}false{% endif %}"
+		data-mod-root="{{ config.root }}{% if mod %}mod.php?/{% endif %}"
+		data-active-page="{{ active_page|default('') }}"
+		data-board="{{ board.uri|default(board|default('')) }}"
+		data-thread="{{ thread.id|default('') }}"></script>
 	{% if not config.additional_javascript_compile %}
 	{% for javascript in config.additional_javascript %}<script type="text/javascript" src="{{ config.additional_javascript_url }}{{ javascript }}?v={{ config.resource_version }}"></script>{% endfor %}
 	{% endif %}
@@ -21,35 +30,7 @@
 	{% endif %}
 {% endif %}
 {% if config.captcha.provider == 'recaptcha' %}<script src="//www.recaptcha.net/recaptcha/api.js"></script>
-<style type="text/css">{% verbatim %}
-	#recaptcha_area {
-		float: none !important;
-		padding: 0 !important;
-	}
-	#recaptcha_logo, #recaptcha_privacy {
-		display: none;
-	}
-	#recaptcha_table {
-		border: none !important;
-	}
-	#recaptcha_table tr:first-child {
-		height: auto;
-	}
-	.recaptchatable img {
-		float: none !important;
-	}
-	#recaptcha_response_field {
-		font-size: 10pt !important;
-		border: 1px solid #a9a9a9 !important;
-		padding: 1px !important;
-	}
-	td.recaptcha_image_cell {
-		background: transparent !important;
-	}
-	.recaptchatable, #recaptcha_area tr, #recaptcha_area td, #recaptcha_area th {
-		padding: 0 !important;
-	}
-{% endverbatim %}</style>{% endif %}
+<link rel="stylesheet" href="{{ config.root }}stylesheets/recaptcha.css?v={{ config.resource_version }}">{% endif %}
 {% if config.captcha.provider.hcaptcha %}
 <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
 {% endif %}

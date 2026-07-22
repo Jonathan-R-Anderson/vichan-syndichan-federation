@@ -2,17 +2,7 @@
 <html>
 <head>
 	<meta charset="utf-8">
-
-        <script type="text/javascript">
-	  var
-          {% if not no_post_form %}
-              active_page = "index"
-            , board_name = "{{ board.uri }}";
-	  {% else %}
-              active_page = "ukko";
-          {% endif %}
-        </script>
-
+	{% set active_page = no_post_form ? 'ukko' : 'index' %}
 	{% include 'header.html' %}
 
 	{% set meta_subject %}{% if config.thread_subject_in_title and thread.subject %}{{ thread.subject|e }}{% else %}{{ thread.body_nomarkup|remove_modifiers[:256]|e }}{% endif %}{% endset %}
@@ -101,9 +91,6 @@
 	{{ config.ad.bottom }}
 
 	{% include 'footer.html' %}
-	<script type="text/javascript">{% verbatim %}
-		ready();
-	{% endverbatim %}</script>
 
 </body>
 </html>

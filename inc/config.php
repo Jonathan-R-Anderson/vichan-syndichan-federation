@@ -1174,6 +1174,25 @@
 	// You can use this to bypass the user's browsers and CDN caches.
 	$config['resource_version'] = 0;
 
+	/*
+	 * Content-Security-Policy. When set to a non-empty string it is emitted as a
+	 * <meta http-equiv="Content-Security-Policy"> tag in the page <head> (a meta tag is
+	 * used because boards are served as static HTML, so per-request headers/nonces are not
+	 * possible). Leave false to send no policy.
+	 *
+	 * The page shell (the JS bootstrap that tells main.js which board/page it is on) no
+	 * longer relies on an inline <script>; page context is passed via data-* attributes on
+	 * the main.js tag instead. Some inline scripts/handlers and inline style="" attributes
+	 * still remain, so a policy without 'unsafe-inline' is not fully supported yet — start
+	 * from a permissive policy and tighten as your setup allows.
+	 *
+	 * Example (adjust the captcha/embedding hosts you actually use):
+	 * $config['csp'] = "default-src 'self'; img-src 'self' data:; media-src 'self'; "
+	 *   . "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; "
+	 *   . "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';";
+	 */
+	$config['csp'] = false;
+
 	// Dispatch thumbnail loading and image configuration with JavaScript. It will need a certain javascript
 	// code to work.
 	$config['javascript_image_dispatch'] = false;
