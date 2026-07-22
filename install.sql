@@ -368,6 +368,28 @@ CREATE TABLE IF NOT EXISTS `anime_captcha` (
   KEY `category` (`category`)
 ) ENGINE=InnoDB  DEFAULT CHARSET=utf8mb4;
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `boardlinks`
+--
+-- Admin-managed entries for the navigation "boardlinks" bar (see createBoardlist()).
+-- A row with an empty `url` is a link to the board named in `title`; a row with a
+-- `url` is a custom link labelled `title`. A non-empty `group_name` places the entry
+-- inside a [bracketed] group. Managed from the mod panel (?/boardlinks).
+--
+
+CREATE TABLE IF NOT EXISTS `boardlinks` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `group_name` VARCHAR(255) NOT NULL DEFAULT '',
+  `title` VARCHAR(255) NOT NULL,
+  `url` VARCHAR(255) NOT NULL DEFAULT '',
+  `position` INT(11) NOT NULL DEFAULT 0,
+  `created_at` INT(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `position` (`position`)
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8mb4;
+
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

@@ -44,10 +44,68 @@ function doBoardListPart($list, $root, &$boards) {
 	return $body;
 }
 
+/**
+ * Board navigation links added by admins from the mod panel (?/boardlinks).
+ *
+ * Returns a fragment shaped like $config['boards'] so it can be merged straight into
+ * createBoardlist(): numeric-keyed values are board URIs, string-keyed values are
+ * custom "label => url" links, and a group_name nests entries inside a bracket group.
+ * The result is memoised for the duration of the request (rebuilds render many pages).
+ */
+function get_boardlinks() {
+	static $cache = null;
+	if ($cache !== null) {
+		return $cache;
+	}
+
+	$links = array();
+	$groups = array();
+
+	// The table may not exist on installs that predate this feature; fail soft.
+	try {
+		$query = query("SELECT * FROM ``boardlinks`` ORDER BY `position` ASC, `id` ASC");
+	} catch (PDOException $e) {
+		$query = false;
+	}
+
+	if ($query) {
+		foreach ($query->fetchAll(PDO::FETCH_ASSOC) as $row) {
+			$group = $row['group_name'];
+			if ($row['url'] !== '') {
+				// Custom link. doBoardListPart() emits these values as raw HTML, so
+				// escape here (the mod list template escapes independently via |e).
+				$label = htmlspecialchars($row['title'], ENT_QUOTES);
+				$url = htmlspecialchars($row['url'], ENT_QUOTES);
+				if ($group === '') {
+					$links[$label] = $url;
+				} else {
+					$groups[$group][$label] = $url;
+				}
+			} else {
+				// Board link: the value is a board URI, validated on insert.
+				if ($group === '') {
+					$links[] = $row['title'];
+				} else {
+					$groups[$group][] = $row['title'];
+				}
+			}
+		}
+		foreach ($groups as $name => $sub) {
+			$links[htmlspecialchars($name, ENT_QUOTES)] = $sub;
+		}
+	}
+
+	$cache = $links;
+	return $links;
+}
+
 function createBoardlist($mod=false) {
 	global $config;
 
-	if (!isset($config['boards'])) return array('top'=>'','bottom'=>'');
+	$boardlinks = isset($config['boards']) ? $config['boards'] : array();
+	$boardlinks = array_merge($boardlinks, get_boardlinks());
+
+	if (empty($boardlinks)) return array('top'=>'','bottom'=>'');
 
 	$xboards = listBoards();
 	$boards = array();
@@ -55,7 +113,7 @@ function createBoardlist($mod=false) {
 		$boards[$val['uri']] = $val['title'];
 	}
 
-	$body = doBoardListPart($config['boards'], $mod?'?/':$config['root'], $boards);
+	$body = doBoardListPart($boardlinks, $mod?'?/':$config['root'], $boards);
 
 	if ($config['boardlist_wrap_bracket'] && !preg_match('/\] $/', $body))
 		$body = '[' . $body . ']';

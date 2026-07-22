@@ -1,0 +1,72 @@
+<fieldset>
+	<legend>{% trans 'Add boardlink' %}</legend>
+	<form style="margin:0" action="?/boardlinks" method="post">
+		<input type="hidden" name="token" value="{{ token }}">
+		<table>
+			<tr>
+				<th><label for="board">{% trans 'Board' %}</label></th>
+				<td>
+					<select name="board" id="board">
+						<option value="">&mdash;</option>
+						{% for b in boards %}
+							<option value="{{ b.uri|e }}">/{{ b.uri|e }}/ &mdash; {{ b.title|e }}</option>
+						{% endfor %}
+					</select>
+				</td>
+			</tr>
+			<tr>
+				<th colspan="2" class="unimportant" style="text-align:center">{% trans '— or a custom link —' %}</th>
+			</tr>
+			<tr>
+				<th><label for="title">{% trans 'Label' %}</label></th>
+				<td><input type="text" size="40" name="title" id="title" placeholder="{% trans 'e.g. Status' %}"></td>
+			</tr>
+			<tr>
+				<th><label for="url">{% trans 'URL' %}</label></th>
+				<td><input type="text" size="55" name="url" id="url" placeholder="https://example.org/"></td>
+			</tr>
+			<tr>
+				<th><label for="group_name">{% trans 'Group' %}</label></th>
+				<td><input type="text" size="40" name="group_name" id="group_name" placeholder="{% trans 'optional bracketed group' %}"></td>
+			</tr>
+			<tr>
+				<th><label for="position">{% trans 'Position' %}</label></th>
+				<td><input type="number" name="position" id="position" value="0"></td>
+			</tr>
+		</table>
+		<p style="text-align:center">
+			<input type="submit" value="{% trans 'Add boardlink' %}">
+		</p>
+	</form>
+</fieldset>
+
+<p class="unimportant" style="text-align:center;word-wrap:break-word">
+	{% trans 'Pick a board for a board link, or fill in a label and URL for a custom link.' %}
+	{% trans 'Changes appear on cached pages after a rebuild.' %}
+	<a href="?/rebuild">{% trans 'Rebuild now' %}</a>
+</p>
+
+<table class="mod" style="width:100%">
+	<tr>
+		<th>{% trans 'Link' %}</th>
+		<th>{% trans 'Target' %}</th>
+		<th>{% trans 'Group' %}</th>
+		<th>{% trans 'Position' %}</th>
+		<th></th>
+	</tr>
+	{% for link in boardlinks %}
+		<tr>
+			<td>{% if link.url %}{{ link.title|e }}{% else %}/{{ link.title|e }}/{% endif %}</td>
+			<td>{% if link.url %}{{ link.url|e }}{% else %}<em>{% trans 'board' %}</em>{% endif %}</td>
+			<td>{{ link.group_name|e }}</td>
+			<td>{{ link.position }}</td>
+			<td>
+				<a class="unimportant" href="?/boardlinks/delete/{{ link.id }}/{{ link.delete_token }}">[{% trans 'delete' %}]</a>
+			</td>
+		</tr>
+	{% else %}
+		<tr>
+			<td colspan="5" style="text-align:center">{% trans 'No boardlinks yet.' %}</td>
+		</tr>
+	{% endfor %}
+</table>

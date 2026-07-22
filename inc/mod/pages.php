@@ -713,6 +713,81 @@ function mod_captcha_delete(Context $ctx, $id) {
 	header('Location: ?/captcha', true, $config['redirect_http']);
 }
 
+function mod_boardlinks(Context $ctx) {
+	global $mod;
+	$config = $ctx->get('config');
+
+	if (!hasPermission($config['mod']['edit_boardlinks']))
+		error($config['error']['noaccess']);
+
+	if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+		$url = isset($_POST['url']) ? trim($_POST['url']) : '';
+		$group_name = isset($_POST['group_name']) ? trim($_POST['group_name']) : '';
+		$position = (isset($_POST['position']) && $_POST['position'] !== '') ? (int)$_POST['position'] : 0;
+
+		if ($url !== '') {
+			// Custom link: needs a label and a safe URL scheme.
+			$title = isset($_POST['title']) ? trim($_POST['title']) : '';
+			if ($title === '')
+				error(_('A custom link needs a label.'));
+			if (!preg_match('#^(https?://|/|\?|\#|mailto:)#i', $url))
+				error(_('Custom link URLs must start with http://, https://, /, ?, # or mailto:.'));
+		} else {
+			// Board link: the title must be an existing/valid board URI.
+			$title = isset($_POST['board']) && $_POST['board'] !== '' ? trim($_POST['board']) : '';
+			if ($title === '' || !preg_match('/^' . $config['board_regex'] . '$/u', $title))
+				error(_('Select a board, or provide a custom link URL.'));
+		}
+
+		$query = prepare('INSERT INTO ``boardlinks`` (`group_name`, `title`, `url`, `position`, `created_at`) VALUES (:group_name, :title, :url, :position, :created_at)');
+		$query->bindValue(':group_name', $group_name);
+		$query->bindValue(':title', $title);
+		$query->bindValue(':url', $url);
+		$query->bindValue(':position', $position, PDO::PARAM_INT);
+		$query->bindValue(':created_at', time());
+		$query->execute() or error(db_error($query));
+
+		modLog('Added a boardlink');
+
+		header('Location: ?/boardlinks', true, $config['redirect_http']);
+		return;
+	}
+
+	$query = query("SELECT * FROM ``boardlinks`` ORDER BY `position` ASC, `id` ASC") or error(db_error());
+	$boardlinks = $query->fetchAll(PDO::FETCH_ASSOC);
+
+	foreach ($boardlinks as &$link) {
+		$link['delete_token'] = make_secure_link_token('boardlinks/delete/' . $link['id']);
+	}
+	unset($link);
+
+	mod_page(
+		_('Boardlinks'),
+		$config['file_mod_boardlinks'],
+		[
+			'boardlinks' => $boardlinks,
+			'boards' => listBoards(),
+			'token' => make_secure_link_token('boardlinks')
+		],
+		$mod
+	);
+}
+
+function mod_boardlinks_delete(Context $ctx, $id) {
+	$config = $ctx->get('config');
+
+	if (!hasPermission($config['mod']['edit_boardlinks']))
+		error($config['error']['noaccess']);
+
+	$query = prepare('DELETE FROM ``boardlinks`` WHERE `id` = :id');
+	$query->bindValue(':id', $id);
+	$query->execute() or error(db_error($query));
+
+	modLog('Deleted a boardlink');
+
+	header('Location: ?/boardlinks', true, $config['redirect_http']);
+}
+
 function mod_news(Context $ctx, $page_no = 1) {
 	global $pdo, $mod;
 	$config = $ctx->get('config');

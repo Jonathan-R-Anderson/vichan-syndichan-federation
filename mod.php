@@ -56,6 +56,9 @@ $pages = [
 	'/captcha'				=> 'secure_POST captcha',	// manage anime captcha challenges
 	'/captcha/delete/(\d+)'			=> 'secure captcha_delete',	// delete an anime captcha challenge
 
+	'/boardlinks'				=> 'secure_POST boardlinks',	// manage navigation boardlinks
+	'/boardlinks/delete/(\d+)'		=> 'secure boardlinks_delete',	// delete a boardlink
+
 	'/edit/(\%b)'				=> 'secure_POST edit_board',	// edit board details
 	'/new-board'				=> 'secure_POST new_board',	// create a new board
 

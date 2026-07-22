@@ -1378,6 +1378,7 @@
 
 	$config['file_mod_noticeboard'] = 'mod/noticeboard.html';
 	$config['file_mod_captcha'] = 'mod/captcha.html';
+	$config['file_mod_boardlinks'] = 'mod/boardlinks.html';
 	$config['file_mod_search_results'] = 'mod/search_results.html';
 
 	$config['file_mod_move'] = 'mod/move.html';
@@ -1824,6 +1825,8 @@
 	$config['pages_max'] = 10;
 	// Manage the "anime" captcha challenge pool (?/captcha)
 	$config['mod']['manage_captcha'] = ADMIN;
+	// Manage the navigation boardlinks bar (?/boardlinks)
+	$config['mod']['edit_boardlinks'] = ADMIN;
 
 	// Config editor permissions
 	$config['mod']['config'] = array();
