@@ -794,12 +794,45 @@ function mod_board_log(Context $ctx, $board, $page_no = 1, $hide_names = false, 
 		error($config['error']['404']);
 
 	if (!hasPermission($config['mod']['show_ip'])) {
-		// Supports ipv4 only!
+		// This mod may not see raw IPs. Rather than blanking them out (which hides which
+		// log entries share an address), replace every IP with a stable cloak so the same
+		// IP always reads as the same token.
+		$cloak_log_ip = function ($token) use ($config) {
+			list($addr, $cidr) = array_pad(explode('/', $token, 2), 2, null);
+			if (filter_var($addr, FILTER_VALIDATE_IP) === false)
+				return $token; // already cloaked, or not an address: leave it untouched
+
+			if (!empty($config['ipcrypt_key'])) {
+				// Same reversible token shown everywhere else; admins can uncloak it.
+				$cloaked = cloak_ip($addr);
+			} else {
+				// Cloaking disabled: a stable, non-reversible salted digest. Consistent per
+				// IP without ever exposing it (relies on secure_trip_salt staying secret).
+				$cloaked = $config['ipcrypt_prefix'] . ':' . substr(sha1($addr . $config['secure_trip_salt']), 0, 10);
+			}
+			return $cidr === null ? $cloaked : "$cloaked/$cidr";
+		};
+
+		// Matches an ?/IP/ link, a bare IPv4 (optional CIDR), or a bare IPv6 (optional
+		// embedded IPv4 tail, optional CIDR). filter_var() in the callback is the final
+		// arbiter, so an over-broad match is simply left untouched.
+		$ip_pattern = '~<a href="\?/IP/[^"]*">([^<]+)</a>'
+			. '|(\d{1,3}(?:\.\d{1,3}){3}(?:/\d{1,2})?)'
+			. '|([0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){2,}(?:\.\d{1,3}){0,3}(?:/\d{1,3})?)~';
+
 		foreach ($logs as $i => &$log) {
-			$log['text'] = preg_replace_callback('/(?:<a href="\?\/IP\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}">)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?:<\/a>)?/', function($matches) {
-				return "xxxx";//less_ip($matches[1]);
+			$log['text'] = preg_replace_callback($ip_pattern, function ($m) use ($cloak_log_ip) {
+				if (isset($m[1]) && $m[1] !== '') {
+					// An ?/IP/ link: cloak the address and drop the (now useless) link.
+					// If the token wasn't a raw IP, keep the original markup intact.
+					$cloaked = $cloak_log_ip($m[1]);
+					return $cloaked === $m[1] ? $m[0] : $cloaked;
+				}
+				$token = (isset($m[2]) && $m[2] !== '') ? $m[2] : ($m[3] ?? '');
+				return $cloak_log_ip($token);
 			}, $log['text']);
 		}
+		unset($log);
 	}
 
 	$query = prepare("SELECT COUNT(*) FROM ``modlogs`` LEFT JOIN ``mods`` ON `mod` = ``mods``.`id` WHERE `board` = :board");
