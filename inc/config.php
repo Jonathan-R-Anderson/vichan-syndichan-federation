@@ -288,7 +288,10 @@
 	$config['simple_spam'] = false;
 
 	$config['captcha'] = [
-		// Can be false, 'recaptcha', 'hcaptcha' or 'native'.
+		// Can be false, 'recaptcha', 'hcaptcha', 'native' or 'anime'.
+		// - 'native' is the self-hosted distorted-text captcha.
+		// - 'anime'  is the self-hosted image quiz ("which anime character is this?"),
+		//            whose challenges are managed from the mod panel (?/captcha).
 		'provider' => false,
 		/*
 		 * If not false, the captcha is dynamically injected on the client if the web server set the `captcha-required`
@@ -317,6 +320,21 @@
 			// Custom captcha extra field (eg. charset)
 			'extra' => 'abcdefghijklmnopqrstuvwxyz',
 			// New thread captcha. Require solving a captcha to post a thread.
+			'new_thread_capt' => false
+		],
+		// Self-hosted "anime" image-quiz captcha. Manage the challenge pool from the
+		// mod panel (?/captcha). Remember to load js/anime-captcha.js (see below) and
+		// point inc/captcha/config.php at your database. Read more at: /inc/captcha/readme.md
+		'anime' => [
+			// Endpoint that hands out a challenge.
+			'provider_get' => '/inc/captcha/anime.php',
+			// Endpoint that verifies the answer.
+			'provider_check' => '/inc/captcha/anime.php',
+			// Key the challenge is stored under; must be stable between get and check.
+			'extra' => 'anime',
+			// Optionally restrict challenges to a single category (empty = whole pool).
+			'category' => '',
+			// New thread captcha. Require solving a captcha only to post a thread.
 			'new_thread_capt' => false
 		]
 	];
@@ -1124,6 +1142,8 @@
 	// $config['additional_javascript'][] = 'js/post-hover.js';
 	// $config['additional_javascript'][] = 'js/style-select.js';
 	// $config['additional_javascript'][] = 'js/captcha.js';
+	// For the 'anime' captcha provider load this instead of js/captcha.js:
+	// $config['additional_javascript'][] = 'js/anime-captcha.js';
 
 	// Where these script files are located on the web. Defaults to $config['root'].
 	// $config['additional_javascript_url'] = 'http://static.example.org/vichan-javascript-stuff/';
@@ -1357,6 +1377,7 @@
 	$config['file_mod_ban_appeals'] = 'mod/ban_appeals.html';
 
 	$config['file_mod_noticeboard'] = 'mod/noticeboard.html';
+	$config['file_mod_captcha'] = 'mod/captcha.html';
 	$config['file_mod_search_results'] = 'mod/search_results.html';
 
 	$config['file_mod_move'] = 'mod/move.html';
@@ -1801,6 +1822,8 @@
 	// Create pages
 	$config['mod']['edit_pages'] = MOD;
 	$config['pages_max'] = 10;
+	// Manage the "anime" captcha challenge pool (?/captcha)
+	$config['mod']['manage_captcha'] = ADMIN;
 
 	// Config editor permissions
 	$config['mod']['config'] = array();

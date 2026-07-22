@@ -123,6 +123,39 @@ WebM support
 ------------
 Read `inc/lib/webm/README.md` for information about enabling webm.
 
+Captcha
+------------
+vichan can require posters to solve a captcha. The provider is selected with
+`$config['captcha']['provider']`, which may be `false`, `'recaptcha'`,
+`'hcaptcha'`, `'native'` (self-hosted distorted text) or `'anime'`.
+
+### Anime captcha
+
+The `'anime'` provider is a self-hosted image quiz inspired by
+[leomotors/anime-captcha](https://github.com/leomotors/anime-captcha) (MIT):
+the poster is shown an anime image and must pick the character it depicts from a
+set of options. The wrong options are drawn automatically from the answers of
+the other challenges in the pool, so the more challenges you add the harder it is
+to guess. Because the challenge is fetched per-user over AJAX, it works with
+vichan's statically cached pages.
+
+To enable it:
+
+1.  Point `inc/captcha/config.php` at your database (same one vichan uses). The
+    `captchas` and `anime_captcha` tables are created by `install.sql`.
+2.  In your instance config set:
+
+        $config['captcha']['provider'] = 'anime';
+        $config['additional_javascript'][] = 'js/anime-captcha.js';
+
+    (Load `js/anime-captcha.js` instead of `js/captcha.js`.) Optional settings
+    live under `$config['captcha']['anime']` (e.g. `new_thread_capt`, `category`)
+    and in `inc/captcha/config.php` (`$anime_num_choices`, `$anime_default_question`).
+3.  Add challenges from the mod panel at **?/captcha** (dashboard → "Anime
+    captcha"). Each challenge is an image URL plus the correct answer, with an
+    optional per-challenge question and category. Access is gated by the
+    `$config['mod']['manage_captcha']` permission (admin by default).
+
 Docker
 ------------
 Vichan comes with a Dockerfile and docker-compose configuration, the latter aimed primarily at development and testing.

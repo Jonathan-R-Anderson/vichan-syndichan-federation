@@ -53,6 +53,9 @@ $pages = [
 	'/noticeboard/(\d+)'			=> 'secure_POST noticeboard',	// view noticeboard
 	'/noticeboard/delete/(\d+)'		=> 'secure noticeboard_delete',	// delete from noticeboard
 
+	'/captcha'				=> 'secure_POST captcha',	// manage anime captcha challenges
+	'/captcha/delete/(\d+)'			=> 'secure captcha_delete',	// delete an anime captcha challenge
+
 	'/edit/(\%b)'				=> 'secure_POST edit_board',	// edit board details
 	'/new-board'				=> 'secure_POST new_board',	// create a new board
 

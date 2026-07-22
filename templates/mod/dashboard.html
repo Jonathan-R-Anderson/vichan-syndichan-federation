@@ -67,6 +67,9 @@
 			<li><a href="?/noticeboard">{% trans 'View all noticeboard entries' %}</a></li>
 		{% endif %}
 		<li><a href="?/edit_news">{% trans 'News' %}</a></li>
+		{% if mod|hasPermission(config.mod.manage_captcha) %}
+			<li><a href="?/captcha">{% trans 'Anime captcha' %}</a></li>
+		{% endif %}
 		<li>
 			<a href="?/inbox">
 				{% trans 'PM inbox' %}

@@ -347,6 +347,27 @@ CREATE TABLE IF NOT EXISTS `captchas` (
   PRIMARY KEY (`cookie`,`extra`)
 ) ENGINE=InnoDB  DEFAULT CHARSET=utf8mb4;
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `anime_captcha`
+--
+-- Pool of challenges for the native "anime" captcha. Each row is one image and
+-- the character/answer it depicts; the answer choices shown to a user are drawn
+-- from the `answer` values across the pool. Managed from the mod panel (?/captcha).
+--
+
+CREATE TABLE IF NOT EXISTS `anime_captcha` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `category` VARCHAR(200) NOT NULL DEFAULT '',
+  `image_url` TEXT NOT NULL,
+  `question` VARCHAR(255) NOT NULL DEFAULT '',
+  `answer` VARCHAR(255) NOT NULL,
+  `created_at` INT(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `category` (`category`)
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8mb4;
+
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

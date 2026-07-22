@@ -516,12 +516,7 @@ if (isset($_POST['delete'])) {
 		}
 
 		try {
-			$query = new NativeCaptchaQuery(
-				$context->get(HttpDriver::class),
-				$config['domain'],
-				$config['captcha']['provider_check'],
-				$config['captcha']['extra']
-			);
+			$query = $context->get(NativeCaptchaQuery::class);
 			$success = $query->verify(
 				$_POST['captcha_text'],
 				$_POST['captcha_cookie']
@@ -630,14 +625,17 @@ if (isset($_POST['delete'])) {
 		// Check for CAPTCHA right after opening the board so the "return" link is in there.
 		try {
 			$provider = $config['captcha']['provider'];
-			$new_thread_capt = $config['captcha']['native']['new_thread_capt'];
+			// Both self-hosted captchas ('native' text, 'anime' image quiz) go through
+			// the same NativeCaptchaQuery check protocol.
+			$is_native = ($provider === 'native' || $provider === 'anime');
+			$new_thread_capt = $is_native ? $config['captcha'][$provider]['new_thread_capt'] : false;
 			$dynamic = $config['captcha']['dynamic'];
 
 			// With our custom captcha provider
-			if (($provider === 'native' && !$new_thread_capt)
-				|| ($provider === 'native' && $new_thread_capt && $post['op'])) {
+			if (($is_native && !$new_thread_capt)
+				|| ($is_native && $new_thread_capt && $post['op'])) {
 				$query = $context->get(NativeCaptchaQuery::class);
-				$success = $query->verify($_POST['captcha_text'], $_POST['captcha_cookie']);
+				$success = $query->verify($_POST['captcha_text'] ?? '', $_POST['captcha_cookie'] ?? '');
 
 				if (!$success) {
 					error(
@@ -645,8 +643,8 @@ if (isset($_POST['delete'])) {
 						<script>
 							if (actually_load_captcha !== undefined)
 								actually_load_captcha(
-									\"{$config['captcha']['provider_get']}\",
-									\"{$config['captcha']['extra']}\"
+									\"{$config['captcha'][$provider]['provider_get']}\",
+									\"{$config['captcha'][$provider]['extra']}\"
 								);
 						</script>"
 					);

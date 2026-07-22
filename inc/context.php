@@ -73,14 +73,17 @@ function build_context(array $config): Context {
 		},
 		NativeCaptchaQuery::class => function($c) {
 			$config = $c->get('config');
-			if ($config['captcha']['provider'] !== 'native') {
+			$provider = $config['captcha']['provider'];
+			// Both the distorted-text ('native') and the image-quiz ('anime') captchas
+			// are self-hosted and share the NativeCaptchaQuery check protocol.
+			if ($provider !== 'native' && $provider !== 'anime') {
 				throw new \RuntimeException('No native captcha service available');
 			}
 			return new NativeCaptchaQuery(
 				$c->get(HttpDriver::class),
 				$config['domain'],
-				$config['captcha']['native']['provider_check'],
-				$config['captcha']['native']['extra']
+				$config['captcha'][$provider]['provider_check'],
+				$config['captcha'][$provider]['extra']
 			);
 		},
 		CacheDriver::class => function($c) {

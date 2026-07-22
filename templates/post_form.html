@@ -118,6 +118,19 @@
                 	</tr>
 			{% endif %}
 		{% endif %}
+		{% if config.captcha.provider == 'anime' %}
+			{% if not config.captcha.anime.new_thread_capt or not id %}
+			<tr class='captcha'>
+				<th>
+					{% trans %}Verification{% endtrans %}
+				</th>
+				<td>
+					<script>load_captcha("{{ config.captcha.anime.provider_get }}", "{{ config.captcha.anime.extra }}", "{{ config.captcha.anime.category }}");</script>
+					<noscript>{% trans %}Please enable JavaScript to solve the verification challenge.{% endtrans %}</noscript>
+				</td>
+			</tr>
+			{% endif %}
+		{% endif %}
 		{% if config.user_flag %}
 			<tr>
 				<th>{% trans %}Flag{% endtrans %}</th>

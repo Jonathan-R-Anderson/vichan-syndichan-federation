@@ -1,0 +1,58 @@
+<fieldset>
+	<legend>{% trans 'Add captcha challenge' %}</legend>
+	<form style="margin:0" action="?/captcha" method="post">
+		<input type="hidden" name="token" value="{{ token }}">
+		<table>
+			<tr>
+				<th><label for="image_url">{% trans 'Image URL' %}</label></th>
+				<td><input type="text" size="55" name="image_url" id="image_url" placeholder="https://example.com/character.png"></td>
+			</tr>
+			<tr>
+				<th><label for="answer">{% trans 'Answer' %}</label></th>
+				<td><input type="text" size="55" name="answer" id="answer" placeholder="{% trans 'Character name' %}"></td>
+			</tr>
+			<tr>
+				<th><label for="question">{% trans 'Question' %}</label></th>
+				<td><input type="text" size="55" name="question" id="question" placeholder="{% trans 'Which anime character is this? (optional)' %}"></td>
+			</tr>
+			<tr>
+				<th><label for="category">{% trans 'Category' %}</label></th>
+				<td><input type="text" size="55" name="category" id="category" placeholder="{% trans 'optional' %}"></td>
+			</tr>
+		</table>
+		<p style="text-align:center">
+			<input type="submit" value="{% trans 'Add challenge' %}">
+		</p>
+	</form>
+</fieldset>
+
+<p class="unimportant" style="text-align:center;word-wrap:break-word">
+	{% trans 'Answer options are drawn from the answers across the whole pool, so add several challenges for the choices to be meaningful.' %}
+</p>
+
+<table class="mod" style="width:100%">
+	<tr>
+		<th>{% trans 'Image' %}</th>
+		<th>{% trans 'Answer' %}</th>
+		<th>{% trans 'Question' %}</th>
+		<th>{% trans 'Category' %}</th>
+		<th>{% trans 'Added' %}</th>
+		<th></th>
+	</tr>
+	{% for challenge in challenges %}
+		<tr>
+			<td><img src="{{ challenge.image_url|e }}" alt="" style="max-width:80px;max-height:80px"></td>
+			<td>{{ challenge.answer|e }}</td>
+			<td>{{ challenge.question|e }}</td>
+			<td>{{ challenge.category|e }}</td>
+			<td>{{ challenge.created_at|date(config.post_date) }}</td>
+			<td>
+				<a class="unimportant" href="?/captcha/delete/{{ challenge.id }}/{{ challenge.delete_token }}">[{% trans 'delete' %}]</a>
+			</td>
+		</tr>
+	{% else %}
+		<tr>
+			<td colspan="6" style="text-align:center">{% trans 'No challenges yet.' %}</td>
+		</tr>
+	{% endfor %}
+</table>

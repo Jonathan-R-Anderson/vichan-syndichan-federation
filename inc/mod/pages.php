@@ -647,6 +647,72 @@ function mod_noticeboard_delete(Context $ctx, $id) {
 	header('Location: ?/noticeboard', true, $config['redirect_http']);
 }
 
+function mod_captcha(Context $ctx) {
+	global $mod;
+	$config = $ctx->get('config');
+
+	if (!hasPermission($config['mod']['manage_captcha']))
+		error($config['error']['noaccess']);
+
+	if (isset($_POST['image_url'], $_POST['answer'])) {
+		$image_url = trim($_POST['image_url']);
+		$answer = trim($_POST['answer']);
+		$question = isset($_POST['question']) ? trim($_POST['question']) : '';
+		$category = isset($_POST['category']) ? trim($_POST['category']) : '';
+
+		if ($image_url === '' || $answer === '')
+			error(_('Both an image URL and an answer are required.'));
+
+		// The `anime_captcha` table has no board prefix (single backticks), matching
+		// inc/captcha/anime.php.
+		$query = prepare('INSERT INTO `anime_captcha` (`category`, `image_url`, `question`, `answer`, `created_at`) VALUES (:category, :image_url, :question, :answer, :created_at)');
+		$query->bindValue(':category', $category);
+		$query->bindValue(':image_url', $image_url);
+		$query->bindValue(':question', $question);
+		$query->bindValue(':answer', $answer);
+		$query->bindValue(':created_at', time());
+		$query->execute() or error(db_error($query));
+
+		modLog('Added an anime captcha challenge');
+
+		header('Location: ?/captcha', true, $config['redirect_http']);
+		return;
+	}
+
+	$query = query('SELECT * FROM `anime_captcha` ORDER BY `id` DESC') or error(db_error());
+	$challenges = $query->fetchAll(PDO::FETCH_ASSOC);
+
+	foreach ($challenges as &$challenge) {
+		$challenge['delete_token'] = make_secure_link_token('captcha/delete/' . $challenge['id']);
+	}
+	unset($challenge);
+
+	mod_page(
+		_('Anime captcha'),
+		$config['file_mod_captcha'],
+		[
+			'challenges' => $challenges,
+			'token' => make_secure_link_token('captcha')
+		],
+		$mod
+	);
+}
+
+function mod_captcha_delete(Context $ctx, $id) {
+	$config = $ctx->get('config');
+
+	if (!hasPermission($config['mod']['manage_captcha']))
+		error($config['error']['noaccess']);
+
+	$query = prepare('DELETE FROM `anime_captcha` WHERE `id` = :id');
+	$query->bindValue(':id', $id);
+	$query->execute() or error(db_error($query));
+
+	modLog('Deleted an anime captcha challenge');
+
+	header('Location: ?/captcha', true, $config['redirect_http']);
+}
+
 function mod_news(Context $ctx, $page_no = 1) {
 	global $pdo, $mod;
 	$config = $ctx->get('config');
@@ -815,10 +881,12 @@ function mod_board_log(Context $ctx, $board, $page_no = 1, $hide_names = false, 
 
 		// Matches an ?/IP/ link, a bare IPv4 (optional CIDR), or a bare IPv6 (optional
 		// embedded IPv4 tail, optional CIDR). filter_var() in the callback is the final
-		// arbiter, so an over-broad match is simply left untouched.
+		// arbiter, so an over-broad match is simply left untouched. The bare branches are
+		// fenced with look-around so a longer run (e.g. a "1.2.3.4.5" version string) isn't
+		// clipped down to a valid-looking IP and half-cloaked.
 		$ip_pattern = '~<a href="\?/IP/[^"]*">([^<]+)</a>'
-			. '|(\d{1,3}(?:\.\d{1,3}){3}(?:/\d{1,2})?)'
-			. '|([0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){2,}(?:\.\d{1,3}){0,3}(?:/\d{1,3})?)~';
+			. '|(?<![\w.])(\d{1,3}(?:\.\d{1,3}){3}(?:/\d{1,2})?)(?![\d.])'
+			. '|(?<![\w.:])([0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){2,}(?:\.\d{1,3}){0,3}(?:/\d{1,3})?)(?![\w.:])~';
 
 		foreach ($logs as $i => &$log) {
 			$log['text'] = preg_replace_callback($ip_pattern, function ($m) use ($cloak_log_ip) {
