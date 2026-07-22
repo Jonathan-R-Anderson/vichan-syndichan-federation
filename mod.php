@@ -62,6 +62,8 @@ $pages = [
 	'/image-hashes'				=> 'secure_POST image_hashes',	// manage image hash blacklist
 	'/image-hashes/delete/(\d+)'		=> 'secure image_hashes_delete',	// delete an image hash ban
 
+	'/emergency'				=> 'secure_POST emergency',	// emergency mode: freeze boards + approve held posts
+
 	'/edit/(\%b)'				=> 'secure_POST edit_board',	// edit board details
 	'/new-board'				=> 'secure_POST new_board',	// create a new board
 

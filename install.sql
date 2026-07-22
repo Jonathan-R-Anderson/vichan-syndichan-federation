@@ -413,6 +413,50 @@ CREATE TABLE IF NOT EXISTS `image_hashes` (
   KEY `algo` (`algo`)
 ) ENGINE=InnoDB  DEFAULT CHARSET=utf8mb4;
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `emergency`
+--
+-- One row per board that is currently in emergency mode (frozen). The special board '*'
+-- means every board is frozen (set by an admin). While a board is frozen, non-staff posts
+-- are held in `post_queue` for approval instead of being published.
+--
+
+CREATE TABLE IF NOT EXISTS `emergency` (
+  `board` VARCHAR(58) NOT NULL,
+  `mod_id` INT(11) NOT NULL DEFAULT 0,
+  `created` INT(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`board`)
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `post_queue`
+--
+-- Posts held for moderator approval while a board is in emergency mode. `post_data` is the
+-- fully-prepared post (PHP serialize) that is replayed through the normal insert on approval;
+-- the other columns are for displaying the queue.
+--
+
+CREATE TABLE IF NOT EXISTS `post_queue` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `board` VARCHAR(58) NOT NULL,
+  `thread` INT(11) DEFAULT NULL,
+  `is_op` TINYINT(1) NOT NULL DEFAULT 0,
+  `ip` VARCHAR(45) NOT NULL DEFAULT '',
+  `time` INT(11) NOT NULL DEFAULT 0,
+  `subject` VARCHAR(100) NOT NULL DEFAULT '',
+  `name` VARCHAR(100) NOT NULL DEFAULT '',
+  `body` TEXT,
+  `num_files` INT(11) NOT NULL DEFAULT 0,
+  `post_data` MEDIUMBLOB NOT NULL,
+  `created` INT(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `board` (`board`)
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8mb4;
+
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

@@ -883,6 +883,114 @@ function mod_image_hashes_delete(Context $ctx, $id) {
 	header('Location: ?/image-hashes', true, $config['redirect_http']);
 }
 
+function mod_emergency(Context $ctx) {
+	global $mod;
+	$config = $ctx->get('config');
+
+	if (!hasPermission($config['mod']['emergency']))
+		error($config['error']['noaccess']);
+
+	require_once 'inc/emergency.php';
+
+	$is_admin = ($mod['boards'][0] === '*');
+
+	if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+		// Freeze / unfreeze a board (or '*' = every board, admin only).
+		if (isset($_POST['toggle'], $_POST['board'])) {
+			$target = $_POST['board'];
+			$on = ($_POST['toggle'] === 'freeze');
+
+			if ($target === '*') {
+				if (!$is_admin)
+					error($config['error']['noaccess']);
+			} else {
+				if (!hasPermission($config['mod']['emergency'], $target))
+					error($config['error']['noaccess']);
+				if (!openBoard($target))
+					error($config['error']['noboard']);
+			}
+
+			emergency_set($target, $on, $mod['id']);
+			modLog(($on ? 'Enabled' : 'Disabled') . ' emergency mode for ' . ($target === '*' ? 'all boards' : '/' . $target . '/'));
+
+			header('Location: ?/emergency', true, $config['redirect_http']);
+			return;
+		}
+
+		// Approve or reject held posts, one or many at a time.
+		if (isset($_POST['approve']) || isset($_POST['reject'])) {
+			$approve = isset($_POST['approve']);
+
+			$ids = [];
+			foreach ($_POST as $key => $unused) {
+				if (preg_match('/^q_(\d+)$/', $key, $match))
+					$ids[] = (int)$match[1];
+			}
+			$ids = array_values(array_unique($ids));
+
+			$done = 0;
+			$approved = [];
+			foreach ($ids as $qid) {
+				$row = emergency_queue_get($qid);
+				if (!$row)
+					continue;
+				// Only act on boards this mod is allowed to moderate.
+				if (!hasPermission($config['mod']['emergency'], $row['board']))
+					continue;
+
+				if ($approve) {
+					$result = emergency_approve_one($row);
+					if ($result !== false) {
+						$approved[] = $result;
+						emergency_queue_delete($qid);
+						$done++;
+					}
+				} else {
+					emergency_reject_one($row);
+					emergency_queue_delete($qid);
+					$done++;
+				}
+			}
+
+			// Rebuild each affected board/thread once, after all inserts.
+			if ($approved) {
+				emergency_rebuild_after($approved);
+			}
+
+			modLog(($approve ? 'Approved' : 'Rejected') . " $done held post(s)");
+
+			header('Location: ?/emergency', true, $config['redirect_http']);
+			return;
+		}
+	}
+
+	$frozen = emergency_frozen_boards();
+	$all_frozen = in_array('*', $frozen, true);
+
+	$boards = [];
+	foreach (listBoards() as $b) {
+		if (!hasPermission($config['mod']['emergency'], $b['uri']))
+			continue;
+		$b['frozen'] = $all_frozen || in_array($b['uri'], $frozen, true);
+		$boards[] = $b;
+	}
+
+	$queue = emergency_queue_list($is_admin ? null : $mod['boards']);
+
+	mod_page(
+		_('Emergency mode'),
+		$config['file_mod_emergency'],
+		[
+			'is_admin' => $is_admin,
+			'all_frozen' => $all_frozen,
+			'boards' => $boards,
+			'queue' => $queue,
+			'token' => make_secure_link_token('emergency')
+		],
+		$mod
+	);
+}
+
 function mod_news(Context $ctx, $page_no = 1) {
 	global $pdo, $mod;
 	$config = $ctx->get('config');

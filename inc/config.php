@@ -1291,6 +1291,7 @@
 		'phpfileserror'			=> _('Upload failure (file #%index%): Error code %code%. Refer to <a href=>"http://php.net/manual/en/features.file-upload.errors.php">http://php.net/manual/en/features.file-upload.errors.php</a>; post discarded.'),
 		'unknownext'			=> _('Unknown file extension.'),
 		'image_hash_banned'		=> _('This image (or one too similar to it) has been banned from being posted here.'),
+		'post_held'				=> _('This board is in emergency mode. Your post has been submitted and is waiting for a moderator to approve it.'),
 		'filesize'				=> _('Maximum file size: %maxsz% bytes<br>Your file\'s size: %filesz% bytes'),
 		'maxsize'				=> _('The file was too big.'),
 		'genwebmerror'			=> _('There was a problem processing your webm.'),
@@ -1397,6 +1398,7 @@
 	$config['file_mod_captcha'] = 'mod/captcha.html';
 	$config['file_mod_boardlinks'] = 'mod/boardlinks.html';
 	$config['file_mod_image_hashes'] = 'mod/image_hashes.html';
+	$config['file_mod_emergency'] = 'mod/emergency.html';
 	$config['file_mod_search_results'] = 'mod/search_results.html';
 
 	$config['file_mod_move'] = 'mod/move.html';
@@ -1851,6 +1853,10 @@
 	$config['mod']['edit_boardlinks'] = ADMIN;
 	// Manage the perceptual image-hash blacklist (?/image-hashes)
 	$config['mod']['manage_image_hashes'] = ADMIN;
+	// Use emergency mode: freeze boards and approve held posts (?/emergency). Admins can
+	// freeze every board; other staff granted this permission can freeze/approve only the
+	// boards they moderate. Lower this (or grant it per-user) to let selected moderators use it.
+	$config['mod']['emergency'] = ADMIN;
 
 	// Config editor permissions
 	$config['mod']['config'] = array();

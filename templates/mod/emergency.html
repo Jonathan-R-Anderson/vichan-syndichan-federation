@@ -1,0 +1,109 @@
+<p class="unimportant" style="text-align:center;word-wrap:break-word">
+	{% if all_frozen %}
+		<strong>{% trans 'Emergency mode is active for ALL boards.' %}</strong>
+	{% else %}
+		{% trans 'Freeze a board to hold new posts from ordinary users for approval instead of publishing them.' %}
+	{% endif %}
+</p>
+
+{% if is_admin %}
+<fieldset>
+	<legend>{% trans 'All boards' %}</legend>
+	<form action="?/emergency" method="post" style="margin:0;text-align:center">
+		<input type="hidden" name="token" value="{{ token }}">
+		<input type="hidden" name="board" value="*">
+		{% if all_frozen %}
+			<input type="hidden" name="toggle" value="unfreeze">
+			<input type="submit" value="{% trans 'Unfreeze all boards' %}">
+		{% else %}
+			<input type="hidden" name="toggle" value="freeze">
+			<input type="submit" value="{% trans 'Freeze all boards' %}">
+		{% endif %}
+	</form>
+</fieldset>
+{% endif %}
+
+<fieldset>
+	<legend>{% trans 'Boards' %}</legend>
+	<table class="mod" style="width:100%">
+		<tr>
+			<th>{% trans 'Board' %}</th>
+			<th>{% trans 'Status' %}</th>
+			<th></th>
+		</tr>
+		{% for b in boards %}
+			<tr>
+				<td>/{{ b.uri|e }}/ <small class="unimportant">{{ b.title|e }}</small></td>
+				<td>{% if b.frozen %}<strong>{% trans 'frozen' %}</strong>{% else %}{% trans 'normal' %}{% endif %}</td>
+				<td>
+					{% if all_frozen %}
+						<span class="unimportant">{% trans 'frozen globally' %}</span>
+					{% else %}
+						<form action="?/emergency" method="post" style="margin:0;display:inline">
+							<input type="hidden" name="token" value="{{ token }}">
+							<input type="hidden" name="board" value="{{ b.uri|e }}">
+							{% if b.frozen %}
+								<input type="hidden" name="toggle" value="unfreeze">
+								<input type="submit" value="{% trans 'Unfreeze' %}">
+							{% else %}
+								<input type="hidden" name="toggle" value="freeze">
+								<input type="submit" value="{% trans 'Freeze' %}">
+							{% endif %}
+						</form>
+					{% endif %}
+				</td>
+			</tr>
+		{% else %}
+			<tr><td colspan="3" style="text-align:center">{% trans 'No boards available.' %}</td></tr>
+		{% endfor %}
+	</table>
+</fieldset>
+
+<fieldset>
+	<legend>{% trans 'Posts awaiting approval' %} ({{ queue|length }})</legend>
+	{% if queue|length > 0 %}
+		<form action="?/emergency" method="post">
+			<input type="hidden" name="token" value="{{ token }}">
+			<p>
+				<input type="submit" name="approve" value="{% trans 'Approve selected' %}">
+				<input type="submit" name="reject" value="{% trans 'Reject selected' %}" onclick="return confirm('{% trans 'Reject and delete the selected posts?' %}');">
+				<label style="margin-left:1em"><input type="checkbox" id="qc-all"> {% trans 'select all' %}</label>
+			</p>
+			<table class="mod" style="width:100%">
+				<tr>
+					<th></th>
+					<th>{% trans 'Board' %}</th>
+					<th>{% trans 'Type' %}</th>
+					<th>{% trans 'Subject / Name' %}</th>
+					<th>{% trans 'Comment' %}</th>
+					<th>{% trans 'Files' %}</th>
+					<th>{% trans 'IP' %}</th>
+					<th>{% trans 'When' %}</th>
+				</tr>
+				{% for q in queue %}
+					<tr>
+						<td><input type="checkbox" class="qc" name="q_{{ q.id }}" value="1"></td>
+						<td>/{{ q.board|e }}/</td>
+						<td>{% if q.is_op %}{% trans 'thread' %}{% else %}{% trans 'reply to' %} {{ q.thread }}{% endif %}</td>
+						<td>{{ q.subject|e }} {% if q.name %}<small class="unimportant">{{ q.name|e }}</small>{% endif %}</td>
+						<td style="white-space:pre-wrap;max-width:340px;word-wrap:break-word">{{ q.body|e }}</td>
+						<td>{{ q.num_files }}</td>
+						<td><a href="?/IP/{{ q.ip|cloak_ip }}">{{ q.ip|cloak_ip }}</a></td>
+						<td>{{ q.time|date(config.post_date) }}</td>
+					</tr>
+				{% endfor %}
+			</table>
+		</form>
+		<script>
+			document.addEventListener('DOMContentLoaded', function() {
+				var all = document.getElementById('qc-all');
+				if (all) all.addEventListener('click', function() {
+					var boxes = document.querySelectorAll('.qc');
+					for (var i = 0; i < boxes.length; i++) boxes[i].checked = all.checked;
+				});
+			});
+		</script>
+	{% else %}
+		<p style="text-align:center" class="unimportant">{% trans 'Nothing is waiting for approval.' %}</p>
+	{% endif %}
+</fieldset>

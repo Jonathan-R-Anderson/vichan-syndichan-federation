@@ -1289,6 +1289,15 @@ if (isset($_POST['delete'])) {
 
 	$post['num_files'] = sizeof($post['files']);
 
+	// Emergency mode: hold ordinary users' posts for moderator approval instead of
+	// publishing them. Staff who can use emergency mode on this board post as normal.
+	require_once 'inc/emergency.php';
+	if (empty($post['mod']) && emergency_frozen($board['uri'])
+		&& !hasPermission($config['mod']['emergency'], $board['uri'])) {
+		emergency_queue_post($post, $board);
+		error($config['error']['post_held']);
+	}
+
 	$post['id'] = $id = post($post);
 	$post['slug'] = slugify($post);
 
