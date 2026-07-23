@@ -1072,6 +1072,13 @@ function mod_nntpchan(Context $ctx) {
 				}
 				break;
 
+			case 'set_outbound':
+				// The outbound content federation tickbox.
+				$on = isset($_POST['outbound_enabled']);
+				nntpchan_setting_set('outbound_enabled', $on ? '1' : '0');
+				modLog(($on ? 'Enabled' : 'Disabled') . ' outbound content federation');
+				break;
+
 			case 'sync_now':
 				// Runs synchronously; large syncs should use cron (tools/nntpchan-sync.php).
 				$sync_summary = nntpchan_sync_all();
@@ -1110,6 +1117,7 @@ function mod_nntpchan(Context $ctx) {
 			'maps' => $maps,
 			'boards' => listBoards(),
 			'ban_count' => $ban_count,
+			'outbound_enabled' => nntpchan_outbound_enabled(),
 			'sync_summary' => $sync_summary,
 			'token' => make_secure_link_token('nntpchan')
 		],

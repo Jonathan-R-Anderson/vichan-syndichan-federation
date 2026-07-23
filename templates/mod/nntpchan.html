@@ -10,6 +10,23 @@
 	{% trans 'Node id:' %} <code>{{ nntp.node_id|e }}</code>.
 </p>
 
+<fieldset>
+	<legend>{% trans 'Outbound content federation' %}</legend>
+	<form action="?/nntpchan" method="post" style="margin:0">
+		<input type="hidden" name="token" value="{{ token }}">
+		<input type="hidden" name="action" value="set_outbound">
+		<label>
+			<input type="checkbox" name="outbound_enabled" value="1"{% if outbound_enabled %} checked{% endif %}>
+			<strong>{% trans 'Push this node\'s own posts out to the hub' %}</strong>
+			{% if outbound_enabled %}<span class="unimportant">({% trans 'currently on' %})</span>{% else %}<span class="unimportant">({% trans 'currently off — consume-only' %})</span>{% endif %}
+		</label>
+		<button type="submit">{% trans 'Save' %}</button>
+		<p class="unimportant" style="margin-top:6px;word-wrap:break-word">
+			{% trans 'When unchecked, this node still ingests posts and image bans from peers but does not broadcast its own posts. Inbound pull and per-board newsgroup mapping are unaffected.' %}
+		</p>
+	</form>
+</fieldset>
+
 {% if sync_summary is not null %}
 	<fieldset>
 		<legend>{% trans 'Sync result' %}</legend>

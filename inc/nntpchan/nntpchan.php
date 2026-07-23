@@ -19,6 +19,46 @@ function nntp_header_safe($val) {
 	return trim(preg_replace('/[\r\n]+/', ' ', (string)$val));
 }
 
+/* ---- runtime NNTPChan toggles (nntp_settings table, set from the mod panel) ---- */
+
+/** Read a runtime setting, memoised for the request. Returns $default if unset. */
+function nntpchan_setting_get($name, $default = null) {
+	static $cache = null;
+	if ($cache === null) {
+		$cache = [];
+		try {
+			$q = query("SELECT `name`, `value` FROM ``nntp_settings``");
+			if ($q) {
+				foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r) {
+					$cache[$r['name']] = $r['value'];
+				}
+			}
+		} catch (PDOException $e) {
+			// table absent on installs predating this feature
+		}
+	}
+	return array_key_exists($name, $cache) ? $cache[$name] : $default;
+}
+
+/** Persist a runtime setting. */
+function nntpchan_setting_set($name, $value) {
+	$q = prepare("INSERT INTO ``nntp_settings`` (`name`, `value`) VALUES (:n, :v) ON DUPLICATE KEY UPDATE `value` = :v2");
+	$q->bindValue(':n', $name);
+	$q->bindValue(':v', (string)$value);
+	$q->bindValue(':v2', (string)$value);
+	$q->execute() or error(db_error($q));
+}
+
+/**
+ * Should this node push its own posts out to the hub? Controlled by the "outbound content
+ * federation" tickbox in the mod panel; falls back to $config['nntpchan']['outbound'].
+ */
+function nntpchan_outbound_enabled() {
+	global $config;
+	$default = !empty($config['nntpchan']['outbound']) ? '1' : '0';
+	return nntpchan_setting_get('outbound_enabled', $default) === '1';
+}
+
 function gen_msgid($board, $id) {
 	global $config;
 

@@ -386,6 +386,21 @@ CREATE TABLE IF NOT EXISTS `nntp_ban_tombstone` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `nntp_settings`
+--
+-- Runtime NNTPChan toggles set from the mod panel (?/nntpchan), e.g. the outbound content
+-- federation tickbox (`outbound_enabled`).
+--
+
+CREATE TABLE IF NOT EXISTS `nntp_settings` (
+  `name` VARCHAR(64) NOT NULL,
+  `value` TEXT,
+  PRIMARY KEY (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `captchas`
 --
 

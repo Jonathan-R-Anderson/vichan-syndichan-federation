@@ -2033,6 +2033,12 @@
 		 */
 		'group' => false, // eg. 'overchan.test'
 
+		// Default state of the "outbound content federation" tickbox in the mod panel
+		// (?/nntpchan): whether this node pushes its own posts out to the hub. The tickbox
+		// stores a runtime override in the nntp_settings table; this is the fallback used
+		// until it is toggled. Untick it for a consume-only ("leech") node.
+		'outbound' => true,
+
 		// --- Federated pull + moderation (managed from the mod panel: ?/nntpchan) ---
 
 		// Minutes between background pull syncs from peers (0 disables). Drive it from cron

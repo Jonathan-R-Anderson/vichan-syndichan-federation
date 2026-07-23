@@ -1317,9 +1317,14 @@ if (isset($_POST['delete'])) {
 		// vvvvv For outbound posts vvvvv
 
 		require_once('inc/nntpchan/nntpchan.php');
-		$msgid = gen_msgid($post['board'], $post['id']);
 
-		$built = post2nntp($post, $msgid);
+		// Respect the "outbound content federation" tickbox (?/nntpchan). When it is off,
+		// this node still ingests from the hub but does not push its own posts out.
+		$built = false;
+		if (nntpchan_outbound_enabled()) {
+			$msgid = gen_msgid($post['board'], $post['id']);
+			$built = post2nntp($post, $msgid);
+		}
 
 		// post2nntp() returns false when the post cannot be federated (e.g. a reply whose
 		// thread we never federated); in that case federation is simply skipped.
