@@ -1,0 +1,144 @@
+<p class="unimportant" style="text-align:center;word-wrap:break-word">
+	{% if nntp.enabled %}
+		{% trans 'NNTPChan federation is enabled.' %}
+	{% else %}
+		<strong>{% trans 'NNTPChan federation is disabled.' %}</strong>
+		{% trans 'Set $config[\'nntpchan\'][\'enabled\'] = true; to activate it.' %}
+	{% endif %}
+	{% trans 'Local server:' %} <code>{{ nntp.server|e }}</code>.
+	{% trans 'Domain:' %} <code>{{ nntp.domain|e }}</code>.
+	{% trans 'Node id:' %} <code>{{ nntp.node_id|e }}</code>.
+</p>
+
+{% if sync_summary is not null %}
+	<fieldset>
+		<legend>{% trans 'Sync result' %}</legend>
+		{% if sync_summary|length > 0 %}
+			<table class="mod" style="width:100%">
+				<tr><th>{% trans 'Peer' %}</th><th>{% trans 'Articles' %}</th><th>{% trans 'Bans' %}</th><th>{% trans 'Status' %}</th></tr>
+				{% for s in sync_summary %}
+					<tr>
+						<td>{{ s.peer|e }}</td>
+						<td>{{ s.articles }}</td>
+						<td>{{ s.bans }}</td>
+						<td>{% if s.error %}<span style="color:#c00">{{ s.error|e }}</span>{% else %}{% trans 'ok' %}{% endif %}</td>
+					</tr>
+				{% endfor %}
+			</table>
+		{% else %}
+			<p class="unimportant" style="text-align:center">{% trans 'No enabled peers to sync (or federation is disabled).' %}</p>
+		{% endif %}
+	</fieldset>
+{% endif %}
+
+<fieldset>
+	<legend>{% trans 'Peers' %}</legend>
+	<table class="mod" style="width:100%">
+		<tr>
+			<th>{% trans 'Name' %}</th>
+			<th>{% trans 'Host' %}</th>
+			<th>{% trans 'Port' %}</th>
+			<th>{% trans 'Enabled' %}</th>
+			<th>{% trans 'Last sync' %}</th>
+			<th></th>
+		</tr>
+		{% for p in peers %}
+			<tr>
+				<td>{{ p.name|e }}</td>
+				<td>{{ p.host|e }}</td>
+				<td>{{ p.port }}</td>
+				<td>{% if p.enabled %}{% trans 'yes' %}{% else %}<em>{% trans 'no' %}</em>{% endif %}</td>
+				<td>{% if p.last_sync > 0 %}{{ p.last_sync|date(config.post_date) }}{% else %}<em>{% trans 'never' %}</em>{% endif %}</td>
+				<td>
+					<form action="?/nntpchan" method="post" style="display:inline;margin:0">
+						<input type="hidden" name="token" value="{{ token }}">
+						<input type="hidden" name="action" value="toggle_peer">
+						<input type="hidden" name="id" value="{{ p.id }}">
+						<input type="submit" value="{% if p.enabled %}{% trans 'Disable' %}{% else %}{% trans 'Enable' %}{% endif %}">
+					</form>
+					<form action="?/nntpchan" method="post" style="display:inline;margin:0" onsubmit="return confirm('{% trans 'Delete this peer?' %}');">
+						<input type="hidden" name="token" value="{{ token }}">
+						<input type="hidden" name="action" value="delete_peer">
+						<input type="hidden" name="id" value="{{ p.id }}">
+						<input type="submit" value="{% trans 'Delete' %}">
+					</form>
+				</td>
+			</tr>
+		{% else %}
+			<tr><td colspan="6" style="text-align:center">{% trans 'No peers configured. One bootstrap peer is enough — overchan flooding carries the mesh.' %}</td></tr>
+		{% endfor %}
+	</table>
+	<form action="?/nntpchan" method="post" style="margin-top:8px">
+		<input type="hidden" name="token" value="{{ token }}">
+		<input type="hidden" name="action" value="add_peer">
+		<input type="text" name="name" placeholder="{% trans 'name (optional)' %}" size="14">
+		<input type="text" name="host" placeholder="{% trans 'host' %}" size="24">
+		<input type="number" name="port" value="119" style="width:70px">
+		<input type="submit" value="{% trans 'Add peer' %}">
+	</form>
+</fieldset>
+
+<fieldset>
+	<legend>{% trans 'Newsgroup → board maps' %}</legend>
+	<table class="mod" style="width:100%">
+		<tr><th>{% trans 'Newsgroup' %}</th><th>{% trans 'Board' %}</th><th></th></tr>
+		{% for m in maps %}
+			<tr>
+				<td><code>{{ m.newsgroup|e }}</code></td>
+				<td>/{{ m.board|e }}/</td>
+				<td>
+					<form action="?/nntpchan" method="post" style="margin:0">
+						<input type="hidden" name="token" value="{{ token }}">
+						<input type="hidden" name="action" value="delete_map">
+						<input type="hidden" name="id" value="{{ m.id }}">
+						<input type="submit" value="{% trans 'Delete' %}">
+					</form>
+				</td>
+			</tr>
+		{% else %}
+			<tr><td colspan="3" style="text-align:center">{% trans 'No newsgroups mapped.' %}</td></tr>
+		{% endfor %}
+	</table>
+	<form action="?/nntpchan" method="post" style="margin-top:8px">
+		<input type="hidden" name="token" value="{{ token }}">
+		<input type="hidden" name="action" value="add_map">
+		<input type="text" name="newsgroup" placeholder="overchan.example" size="24">
+		&rarr;
+		<select name="board">
+			{% for b in boards %}<option value="{{ b.uri|e }}">/{{ b.uri|e }}/ {{ b.title|e }}</option>{% endfor %}
+		</select>
+		<input type="submit" value="{% trans 'Add map' %}">
+	</form>
+</fieldset>
+
+<fieldset>
+	<legend>{% trans 'Sync' %}</legend>
+	<p>
+		{% trans 'Background pull interval:' %}
+		<code>{% if nntp.sync_interval > 0 %}{{ nntp.sync_interval }} {% trans 'minutes' %}{% else %}{% trans 'disabled' %}{% endif %}</code>
+		&mdash; {% trans 'run tools/nntpchan-sync.php from cron for automatic pulls.' %}
+	</p>
+	<form action="?/nntpchan" method="post" style="margin:0">
+		<input type="hidden" name="token" value="{{ token }}">
+		<input type="hidden" name="action" value="sync_now">
+		<input type="submit" value="{% trans 'Sync now' %}">
+	</form>
+</fieldset>
+
+<fieldset>
+	<legend>{% trans 'Federated image bans' %}</legend>
+	<p class="unimportant" style="word-wrap:break-word">
+		{% trans 'Uploads are checked against the perceptual image-hash blacklist by distance.' %}
+		{% trans 'Manage the blacklist at' %} <a href="?/image-hashes">?/image-hashes</a> ({{ ban_count }} {% trans 'entries' %}).
+		{% trans 'Ingest from peers:' %} <code>{% if nntp.banlist_ingest %}{% trans 'on' %}{% else %}{% trans 'off' %}{% endif %}</code>.
+		{% trans 'Banlist group:' %} <code>{{ nntp.banlist_group|e }}</code>.
+		{% trans 'Trust:' %} <code>{% if nntp.banlist_secret %}{% trans 'HMAC shared secret' %}{% else %}{% trans 'open (no signature)' %}{% endif %}</code>.
+	</p>
+	<form action="?/nntpchan" method="post" style="margin:0">
+		<input type="hidden" name="token" value="{{ token }}">
+		<label>{% trans 'Perceptual fingerprint' %} <input type="text" name="fingerprint" size="20" placeholder="{% trans 'hex' %}"></label>
+		<label>{% trans 'sha256' %} <input type="text" name="sha256" size="24" placeholder="{% trans 'hex (optional)' %}"></label>
+		<button type="submit" name="action" value="broadcast_ban">{% trans 'Ban + broadcast' %}</button>
+		<button type="submit" name="action" value="broadcast_unban">{% trans 'Unban + broadcast' %}</button>
+	</form>
+</fieldset>

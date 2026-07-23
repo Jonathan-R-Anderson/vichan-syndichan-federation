@@ -1418,6 +1418,7 @@
 	$config['file_mod_boardlinks'] = 'mod/boardlinks.html';
 	$config['file_mod_image_hashes'] = 'mod/image_hashes.html';
 	$config['file_mod_emergency'] = 'mod/emergency.html';
+	$config['file_mod_nntpchan'] = 'mod/nntpchan.html';
 	$config['file_mod_search_results'] = 'mod/search_results.html';
 
 	$config['file_mod_move'] = 'mod/move.html';
@@ -1876,6 +1877,8 @@
 	// freeze every board; other staff granted this permission can freeze/approve only the
 	// boards they moderate. Lower this (or grant it per-user) to let selected moderators use it.
 	$config['mod']['emergency'] = ADMIN;
+	// Manage NNTPChan federation: peers, newsgroup->board maps, sync, federated image bans (?/nntpchan)
+	$config['mod']['nntpchan'] = ADMIN;
 
 	// Config editor permissions
 	$config['mod']['config'] = array();
@@ -2025,6 +2028,21 @@
 		 * Please set this setting in your board/config.php, not globally.
 		 */
 		'group' => false, // eg. 'overchan.test'
+
+		// --- Federated pull + moderation (managed from the mod panel: ?/nntpchan) ---
+
+		// Minutes between background pull syncs from peers (0 disables). Drive it from cron
+		// via tools/nntpchan-sync.php; a "Sync now" button in the panel runs it on demand.
+		'sync_interval' => 0,
+		// Newsgroup that carries federated image-ban control messages.
+		'banlist_group' => 'overchan.imgban',
+		// This node's identifier, used in federated ban messages.
+		'node_id' => 'vichan',
+		// Ingest and apply image bans broadcast by peers.
+		'banlist_ingest' => false,
+		// Optional shared secret. When non-empty, outbound ban messages are HMAC-signed and
+		// inbound messages without a valid signature are ignored.
+		'banlist_secret' => '',
 	];
 
 

@@ -64,6 +64,8 @@ $pages = [
 
 	'/emergency'				=> 'secure_POST emergency',	// emergency mode: freeze boards + approve held posts
 
+	'/nntpchan'				=> 'secure_POST nntpchan',	// NNTPChan federation: peers, maps, sync, federated bans
+
 	'/edit/(\%b)'				=> 'secure_POST edit_board',	// edit board details
 	'/new-board'				=> 'secure_POST new_board',	// create a new board
 

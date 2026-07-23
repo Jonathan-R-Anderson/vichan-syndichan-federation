@@ -991,6 +991,132 @@ function mod_emergency(Context $ctx) {
 	);
 }
 
+function mod_nntpchan(Context $ctx) {
+	global $mod;
+	$config = $ctx->get('config');
+
+	if (!hasPermission($config['mod']['nntpchan']))
+		error($config['error']['noaccess']);
+
+	require_once 'inc/nntpchan/sync.php';
+
+	$sync_summary = null;
+
+	if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+		$action = isset($_POST['action']) ? $_POST['action'] : '';
+
+		switch ($action) {
+			case 'add_peer':
+				$host = trim($_POST['host'] ?? '');
+				if ($host === '')
+					error(_('A peer host is required.'));
+				$q = prepare("INSERT INTO ``nntp_peers`` (`name`, `host`, `port`, `enabled`, `created`) VALUES (:n, :h, :p, 1, :t)");
+				$q->bindValue(':n', mb_substr(trim($_POST['name'] ?? ''), 0, 120));
+				$q->bindValue(':h', $host);
+				$q->bindValue(':p', max(1, (int)($_POST['port'] ?? 119)), PDO::PARAM_INT);
+				$q->bindValue(':t', time(), PDO::PARAM_INT);
+				$q->execute() or error(db_error($q));
+				modLog('Added NNTPChan peer ' . $host);
+				break;
+
+			case 'delete_peer':
+				$q = prepare("DELETE FROM ``nntp_peers`` WHERE `id` = :id");
+				$q->bindValue(':id', (int)($_POST['id'] ?? 0), PDO::PARAM_INT);
+				$q->execute() or error(db_error($q));
+				modLog('Deleted an NNTPChan peer');
+				break;
+
+			case 'toggle_peer':
+				$q = prepare("UPDATE ``nntp_peers`` SET `enabled` = 1 - `enabled` WHERE `id` = :id");
+				$q->bindValue(':id', (int)($_POST['id'] ?? 0), PDO::PARAM_INT);
+				$q->execute() or error(db_error($q));
+				break;
+
+			case 'add_map':
+				$newsgroup = trim($_POST['newsgroup'] ?? '');
+				$board = trim($_POST['board'] ?? '');
+				if ($newsgroup === '' || $board === '')
+					error(_('A newsgroup and a board are required.'));
+				if (!preg_match('/^' . $config['board_regex'] . '$/u', $board) || !openBoard($board))
+					error($config['error']['noboard']);
+				$q = prepare("INSERT INTO ``nntp_groupmap`` (`newsgroup`, `board`) VALUES (:ng, :b) ON DUPLICATE KEY UPDATE `board` = :b2");
+				$q->bindValue(':ng', $newsgroup);
+				$q->bindValue(':b', $board);
+				$q->bindValue(':b2', $board);
+				$q->execute() or error(db_error($q));
+				modLog('Mapped newsgroup ' . $newsgroup . ' to /' . $board . '/');
+				break;
+
+			case 'delete_map':
+				$q = prepare("DELETE FROM ``nntp_groupmap`` WHERE `id` = :id");
+				$q->bindValue(':id', (int)($_POST['id'] ?? 0), PDO::PARAM_INT);
+				$q->execute() or error(db_error($q));
+				break;
+
+			case 'broadcast_ban':
+			case 'broadcast_unban':
+				$fp = strtolower(trim($_POST['fingerprint'] ?? ''));
+				$sha = strtolower(trim($_POST['sha256'] ?? ''));
+				if (($fp !== '' && !ctype_xdigit($fp)) || ($sha !== '' && !ctype_xdigit($sha)))
+					error(_('Hashes must be hexadecimal.'));
+				if ($fp === '' && $sha === '')
+					error(_('A perceptual fingerprint or a sha256 is required.'));
+				if ($action === 'broadcast_ban') {
+					nntpchan_apply_ban($fp, $sha, 'local');
+					nntpchan_ban_broadcast('ban', $fp, $sha);
+					modLog('Broadcast a federated image ban');
+				} else {
+					nntpchan_apply_unban($fp, $sha);
+					nntpchan_ban_broadcast('unban', $fp, $sha);
+					modLog('Broadcast a federated image unban');
+				}
+				break;
+
+			case 'sync_now':
+				// Runs synchronously; large syncs should use cron (tools/nntpchan-sync.php).
+				$sync_summary = nntpchan_sync_all();
+				modLog('Ran an NNTPChan sync');
+				break;
+
+			default:
+				error($config['error']['noaccess']);
+		}
+
+		// sync_now renders its result inline; every other action redirects (POST/redirect/GET).
+		if ($action !== 'sync_now') {
+			header('Location: ?/nntpchan', true, $config['redirect_http']);
+			return;
+		}
+	}
+
+	$peers = query("SELECT * FROM ``nntp_peers`` ORDER BY `id` ASC") or error(db_error());
+	$peers = $peers->fetchAll(PDO::FETCH_ASSOC);
+
+	$maps = query("SELECT * FROM ``nntp_groupmap`` ORDER BY `newsgroup` ASC") or error(db_error());
+	$maps = $maps->fetchAll(PDO::FETCH_ASSOC);
+
+	$ban_count = 0;
+	$bc = query("SELECT COUNT(*) FROM ``image_hashes``");
+	if ($bc) {
+		$ban_count = (int)$bc->fetchColumn();
+	}
+
+	mod_page(
+		_('NNTPChan federation'),
+		$config['file_mod_nntpchan'],
+		[
+			'nntp' => $config['nntpchan'],
+			'peers' => $peers,
+			'maps' => $maps,
+			'boards' => listBoards(),
+			'ban_count' => $ban_count,
+			'sync_summary' => $sync_summary,
+			'token' => make_secure_link_token('nntpchan')
+		],
+		$mod
+	);
+}
+
 function mod_news(Context $ctx, $page_no = 1) {
 	global $pdo, $mod;
 	$config = $ctx->get('config');

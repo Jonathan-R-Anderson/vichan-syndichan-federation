@@ -79,6 +79,9 @@
 		{% if mod|hasPermission(config.mod.emergency) %}
 			<li><a href="?/emergency">{% trans 'Emergency mode' %}</a></li>
 		{% endif %}
+		{% if mod|hasPermission(config.mod.nntpchan) %}
+			<li><a href="?/nntpchan">{% trans 'NNTPChan federation' %}</a></li>
+		{% endif %}
 		<li>
 			<a href="?/inbox">
 				{% trans 'PM inbox' %}

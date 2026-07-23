@@ -336,6 +336,56 @@ CREATE TABLE IF NOT EXISTS `nntp_references` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `nntp_peers`
+--
+-- NNTPChan peers to pull articles from / push to. Managed from the mod panel (?/nntpchan).
+--
+
+CREATE TABLE IF NOT EXISTS `nntp_peers` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(120) NOT NULL DEFAULT '',
+  `host` VARCHAR(255) NOT NULL,
+  `port` INT(11) NOT NULL DEFAULT 119,
+  `enabled` TINYINT(1) NOT NULL DEFAULT 1,
+  `last_sync` INT(11) NOT NULL DEFAULT 0,
+  `created` INT(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `nntp_groupmap`
+--
+-- Maps an NNTPChan newsgroup (overchan.*) to a local board. Managed from ?/nntpchan.
+--
+
+CREATE TABLE IF NOT EXISTS `nntp_groupmap` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `newsgroup` VARCHAR(255) NOT NULL,
+  `board` VARCHAR(58) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `newsgroup` (`newsgroup`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `nntp_ban_tombstone`
+--
+-- Records image-ban fingerprints that were federated-unbanned, so a later (out-of-order)
+-- ban control message for the same fingerprint is ignored. See inc/nntpchan/sync.php.
+--
+
+CREATE TABLE IF NOT EXISTS `nntp_ban_tombstone` (
+  `hash` VARCHAR(64) NOT NULL,
+  `created` INT(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=ascii;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `captchas`
 --
 
