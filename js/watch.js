@@ -268,7 +268,7 @@ $(function(){
             setTimeout(function() {
               var r = $.getJSON(configRoot+i+"/res/"+j+".json", function(k, x, r) {
 	        handle_thread_json(r.board, r.thread, k);
-              }).error(function(r) {
+              }).fail(function(r) {
 	        if(r.status == 404) handle_thread_404(r.board, r.thread);
 	      });
 	    

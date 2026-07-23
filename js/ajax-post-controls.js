@@ -11,7 +11,7 @@
  *
  */
 
-$(window).ready(function() {
+$(document).ready(function() {
 	var do_not_ajax = false;
 	
 	var setup_form = function($form) {

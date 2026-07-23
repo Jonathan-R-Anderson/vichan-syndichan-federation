@@ -12,7 +12,7 @@
  *
  */
 
-$(window).ready(function() {
+$(document).ready(function() {
 	var settings = new script_settings('ajax');
 	var do_not_ajax = false;
 

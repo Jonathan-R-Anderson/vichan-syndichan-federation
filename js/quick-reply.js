@@ -361,7 +361,7 @@
 		
 		$(window).trigger('quick-reply');
 	
-		$(window).ready(function() {
+		$(document).ready(function() {
 			if (settings.get('hide_at_top', true)) {
 				$(window).scroll(function() {
 					if ($(this).width() <= 400)
@@ -420,7 +420,7 @@
 	};
 	
 	if (settings.get('floating_link', false)) {
-		$(window).ready(function() {
+		$(document).ready(function() {
 			if($('div.banner').length == 0)
 				return;
 			$('<style type="text/css">\

@@ -2049,6 +2049,10 @@
 		// window lapses the thread may return if a peer still carries it. 0 disables.
 		// Overridable from the mod panel (?/nntpchan).
 		'tombstone_days' => 30,
+		// Cap on the number of distinct federated source-watermark images cached under
+		// static/nntp-watermarks/ (each <=256 KB, deduped by content hash). At capacity the
+		// oldest files are pruned to make room, bounding disk use. 0 disables the cap.
+		'watermark_cache_max' => 5000,
 
 		// Default state of the "outbound content federation" tickbox in the mod panel
 		// (?/nntpchan): whether this node pushes its own posts out to the hub. The tickbox

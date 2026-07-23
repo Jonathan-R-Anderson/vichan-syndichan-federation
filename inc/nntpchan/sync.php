@@ -480,11 +480,25 @@ function nntpchan_save_source_watermark($headers, $body) {
 			@mkdir($dir, 0755, true);
 		}
 		if (!is_file($rel)) {
+			// Bound the cache: federated watermarks are attacker-suppliable, so prune the
+			// oldest files when at capacity to prevent unbounded disk growth.
+			$max = isset($config['nntpchan']['watermark_cache_max']) ? (int)$config['nntpchan']['watermark_cache_max'] : 5000;
+			if ($max > 0) {
+				$existing = @glob($dir . '/*') ?: array();
+				if (count($existing) >= $max) {
+					usort($existing, function ($a, $b) { return @filemtime($a) - @filemtime($b); });
+					foreach (array_slice($existing, 0, count($existing) - $max + 1) as $old) {
+						@unlink($old);
+					}
+				}
+			}
 			if (@file_put_contents($rel, $data) === false) {
 				nntp_log("could not save source watermark to $rel");
 				return null;
 			}
 			@chmod($rel, 0644);
+		} else {
+			@touch($rel); // cache hit: refresh mtime so active watermarks survive LRU eviction
 		}
 		return (isset($config['root']) ? $config['root'] : '/') . $rel;
 	}
@@ -499,10 +513,14 @@ function nntpchan_save_source_watermark($headers, $body) {
 function nntpchan_source_attribution_html($headers, $body) {
 	$label = isset($headers['x-source-label']) ? trim($headers['x-source-label']) : '';
 
+	// Render only the locally-saved (embedded) watermark. We deliberately do NOT embed a
+	// remote X-Source-Watermark URL: that would make every viewer's browser fetch an
+	// attacker-controlled URL, turning each federated post into an IP-logging beacon for the
+	// sending node. Nodes that want their watermark shown must embed it (vichan's outbound
+	// path does). The label badge still attributes the post when no image is embedded.
 	$wm_url = nntpchan_save_source_watermark($headers, $body);
 	if ($wm_url === null) {
-		$hdr = isset($headers['x-source-watermark']) ? trim($headers['x-source-watermark']) : '';
-		$wm_url = preg_match('#^https?://#i', $hdr) ? $hdr : '';
+		$wm_url = '';
 	}
 
 	if ($label === '' && $wm_url === '') {

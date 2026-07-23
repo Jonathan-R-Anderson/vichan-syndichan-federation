@@ -174,7 +174,7 @@ if (active_page == 'thread' || active_page == 'index') {
 					if (rules[index].key) {
 						name += ' (CTRL + '+ rules[index].key.toUpperCase() +')';
 					}
-					options += '<option value="'+ index +'">'+ name +'</option>';
+					options += '<option value="'+ index +'">'+ $('<div>').text(name).html() +'</option>';
 				}
 				$('[name="body"]').before('<div class="format-text"><a href="javascript:;" onclick="formatText.toolbar_wrap(this);">Wrap</a><select>'+ options +'</select></div>');
 				$('body').append('<style>#quick-reply .format-text>a{width:15%;display:inline-block;text-align:center;}#quick-reply .format-text>select{width:85%;};</style>');
@@ -208,8 +208,8 @@ if (active_page == 'thread' || active_page == 'index') {
 				<input type="checkbox" name="exclusiveline" class="format_option" '+ (rule.exclusiveline ? 'checked' : '') +'>\
 				<input type="text" name="prefix" class="format_option" size="8" value=\"'+ (rule.prefix ? rule.prefix.replace(/"/g, '&quot;') : '') +'\">\
 				<input type="text" name="suffix" class="format_option" size="8" value=\"'+ (rule.suffix ? rule.suffix.replace(/"/g, '&quot;') : '') +'\">\
-				<input type="text" name="key" class="format_option" size="2" maxlength="1" value=\"'+ rule.key +'\">\
-				<input type="button" value="X" onclick="if(confirm(\'Do you wish to remove the '+ rule.text +' formatting rule?\'))$(this).parent().remove();">\
+				<input type="text" name="key" class="format_option" size="2" maxlength="1" value=\"'+ rule.key.replace(/"/g, '&quot;') +'\">\
+				<input type="button" value="X" onclick="if(confirm(\'Remove this formatting rule?\'))$(this).parent().remove();">\
 				');
 				
 				if ($('.format_rule').length > 0) {

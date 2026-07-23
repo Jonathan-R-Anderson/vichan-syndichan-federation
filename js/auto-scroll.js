@@ -1,4 +1,4 @@
-$('document').ready(function () {
+$(document).ready(function () {
 	var autoScroll = localStorage['autoScroll'] ? true : false;
 	if (window.Options && Options.get_tab('general')){
 		Options.extend_tab('general','<label id=\'autoScroll\'><input type=\'checkbox\' />' + ' Scroll to new posts' + '</label>');
