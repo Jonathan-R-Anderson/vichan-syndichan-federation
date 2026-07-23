@@ -376,6 +376,11 @@ function nntpchan_extract_attachments($headers, $body) {
 		if (stripos($part['type'], 'text/') === 0 || stripos($part['type'], 'message/') === 0) {
 			continue;
 		}
+		// "inline" parts are source watermarks (attribution), not post content — importing
+		// them as the post's image would duplicate the sender's logo onto every post.
+		if (isset($part['disposition']) && $part['disposition'] === 'inline') {
+			continue;
+		}
 		$out[] = $part;
 	}
 	return $out;
@@ -406,13 +411,17 @@ function nntpchan_mime_parts($contentType, $body) {
 		$ph = NNTPClient::parseArticle($rawHeaders . "\n\n")['headers'];
 		$type = isset($ph['content-type']) ? trim(explode(';', $ph['content-type'])[0]) : 'application/octet-stream';
 		$name = '';
-		if (isset($ph['content-disposition']) && preg_match('/filename="?([^";]+)"?/i', $ph['content-disposition'], $fm)) {
-			$name = $fm[1];
+		$disposition = '';
+		if (isset($ph['content-disposition'])) {
+			$disposition = strtolower(trim(explode(';', $ph['content-disposition'])[0]));
+			if (preg_match('/filename="?([^";]+)"?/i', $ph['content-disposition'], $fm)) {
+				$name = $fm[1];
+			}
 		}
 		if (isset($ph['content-transfer-encoding']) && stripos($ph['content-transfer-encoding'], 'base64') !== false) {
 			$data = base64_decode(preg_replace('/\s+/', '', $data));
 		}
-		$parts[] = ['type' => $type, 'name' => $name, 'data' => rtrim($data, "\r\n")];
+		$parts[] = ['type' => $type, 'name' => $name, 'data' => rtrim($data, "\r\n"), 'disposition' => $disposition];
 	}
 	return $parts;
 }

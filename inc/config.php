@@ -2040,6 +2040,10 @@
 		// small image (e.g. your favicon) — maniwani rejects non-http values.
 		'source_label' => '',
 		'source_watermark' => '', // eg. 'https://example.org/favicon.ico'
+		// Preferred over the URL above: embed a small local image (favicon/logo) as an
+		// inline MIME part in every federated article, so maniwani stores and serves the
+		// attribution image itself. Path to a readable image <= 256 KB (png/jpeg/gif/webp).
+		'source_watermark_file' => '', // eg. 'static/logo.png'
 
 		// Default state of the "outbound content federation" tickbox in the mod panel
 		// (?/nntpchan): whether this node pushes its own posts out to the hub. The tickbox

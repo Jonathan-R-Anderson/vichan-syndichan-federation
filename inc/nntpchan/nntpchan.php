@@ -138,7 +138,10 @@ function gen_nntp($headers, $files) {
 				$content .= "Content-Transfer-Encoding: base64\r\n";
 				if (isset($file['name'])) {
 					$fname = preg_replace('/[\r\n\0"]/', '', $file['name']);
-					$content .= "Content-Disposition: attachment; filename=\"$fname\"\r\n";
+					// "attachment" = the post's own image; "inline" = a source watermark the
+					// receiver stores and serves as attribution. Default to attachment.
+					$disp = (isset($file['disposition']) && $file['disposition'] === 'inline') ? 'inline' : 'attachment';
+					$content .= "Content-Disposition: $disp; filename=\"$fname\"\r\n";
 				}
 				$content .= "\r\n";
 				$content .= rtrim(chunk_split(base64_encode($file['text']), 76, "\r\n"), "\r\n");
@@ -353,6 +356,27 @@ function post2nntp($post, $msgid) {
 				'text' => $data,
 				'name' => isset($file['name']) ? $file['name'] : basename($file['file_path']),
 			);
+		}
+	}
+
+	// Source watermark: embed a small local image inline so maniwani stores and serves the
+	// attribution image itself. Appended after the post's own attachments so the post image
+	// stays the "first usable attachment". Skipped if unset, unreadable, empty, or > 256 KB.
+	$wfile = isset($config['nntpchan']['source_watermark_file']) ? $config['nntpchan']['source_watermark_file'] : '';
+	if ($wfile !== '' && is_readable($wfile)) {
+		$wdata = file_get_contents($wfile);
+		if ($wdata !== false && strlen($wdata) > 0 && strlen($wdata) <= 262144) {
+			$wext = strtolower(pathinfo($wfile, PATHINFO_EXTENSION));
+			if ($wext === '') { $wext = 'png'; }
+			$files[] = array(
+				'type'        => nntp_guess_mime($wfile, $wdata),
+				'text'        => $wdata,
+				'name'        => 'source-watermark.' . $wext,
+				'disposition' => 'inline',
+			);
+		}
+		else {
+			nntp_log("source watermark not embedded (empty or > 256 KB): $wfile");
 		}
 	}
 
