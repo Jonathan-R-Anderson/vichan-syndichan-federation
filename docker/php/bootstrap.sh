@@ -42,6 +42,9 @@ ln -nfs \
 # Static files accessible from the webserver must be copied.
 cp -ur /code/static /var/www/
 cp -ur /code/stylesheets /var/www/
+# The mod panel writes admin-uploaded federation assets (e.g. the NNTPChan source
+# watermark) into static/, so php-fpm's user must own it — the copy above lands as root.
+chown -R www-data:www-data /var/www/static
 
 # Ensure correct permissions are set, since this might be bind mount.
 chown www-data /var/www

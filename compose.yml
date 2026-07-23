@@ -98,3 +98,29 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # One-shot schema migration. `docker compose up` rebuilds code but never applies
+  # install.sql, so tables added to the schema later (e.g. nntp_settings, deleted_thread)
+  # would be missing until created by hand. This service waits for the database, then
+  # applies every `CREATE TABLE IF NOT EXISTS` from install.sql. The two seed INSERTs are
+  # stripped, so no existing table or row is touched; it then exits. Best effort — it does
+  # not gate the other services.
+  migrate:
+    image: mysql:lts
+    container_name: vichan_migrate
+    restart: "no"
+    depends_on:
+      - db
+    volumes:
+      - ./install.sql:/install.sql:ro
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        echo "migrate: waiting for database...";
+        i=0; while [ $$i -lt 60 ]; do mysqladmin ping -h db -u root -p"$$MYSQL_ROOT_PASSWORD" --silent 2>/dev/null && break; i=$$((i+1)); sleep 2; done;
+        echo "migrate: applying schema (CREATE-only, seed INSERTs stripped)...";
+        sed '/^INSERT INTO/,/;[[:space:]]*$$/d' /install.sql | mysql -h db -u root -p"$$MYSQL_ROOT_PASSWORD" "$$MYSQL_DATABASE" && echo "migrate: schema up to date." || echo "migrate: FAILED (see logs above).";
