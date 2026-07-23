@@ -151,23 +151,50 @@ function nntp_publish($msg, $id) {
 	}
 	stream_set_timeout($s, $timeout);
 
-	$ok = true;
+	// Build the wire payload once: normalise to CRLF, dot-stuff any line that begins
+	// with '.' (RFC 3977 §3.1.1), then append the terminating "\r\n.\r\n".
+	$body = preg_replace('/\r\n|\r|\n/', "\n", $msg);
+	$body = preg_replace('/^\./m', '..', $body);
+	$body = str_replace("\n", "\r\n", $body);
+	$payload = rtrim($body, "\r\n") . "\r\n.\r\n";
+
+	$ok = false;
 	try {
-		if (fgets($s) === false) {                 // server greeting (200/201)
-			throw new RuntimeException('no greeting from server');
+		$greeting = fgets($s);                       // 200/201 server greeting
+		if ($greeting === false || !preg_match('/^\s*2\d\d/', $greeting)) {
+			throw new RuntimeException('bad greeting: ' . trim((string)$greeting));
 		}
 
+		// Use the streaming extension only when the server actually offers it:
+		// srndv2/INN-style peers answer MODE STREAM with 203. A reader-style hub
+		// (e.g. maniwani) does not implement streaming and only accepts classic
+		// POST, so fall back to that. Success must be an explicit acknowledgement
+		// code — treating "anything but 4xx" as success made an unsupported command
+		// (5xx) look accepted, silently dropping every outbound article.
 		fputs($s, "MODE STREAM\r\n");
-		fgets($s);                                 // 203 streaming enabled (best effort)
+		$modeResp = fgets($s);                        // 203 = streaming available
 
-		fputs($s, "TAKETHIS $id\r\n");
-		fputs($s, $msg);
-		fputs($s, "\r\n.\r\n");
-
-		$resp = fgets($s);                         // 239 accepted / 439 rejected
-		if ($resp !== false && preg_match('/^\s*4\d\d/', $resp)) {
-			nntp_log("server rejected article $id: " . trim($resp));
-			$ok = false;
+		if ($modeResp !== false && preg_match('/^\s*203/', $modeResp)) {
+			fputs($s, "TAKETHIS $id\r\n");
+			fputs($s, $payload);
+			$resp = fgets($s);                       // 239 accepted / 439 rejected
+			$ok = ($resp !== false && preg_match('/^\s*239/', $resp));
+			if (!$ok) {
+				nntp_log("streaming TAKETHIS not accepted for $id: " . trim((string)$resp));
+			}
+		} else {
+			fputs($s, "POST\r\n");
+			$resp = fgets($s);                       // 340 send it / 440 posting not allowed
+			if ($resp !== false && preg_match('/^\s*340/', $resp)) {
+				fputs($s, $payload);
+				$resp = fgets($s);                   // 240 accepted / 44x failed
+				$ok = ($resp !== false && preg_match('/^\s*240/', $resp));
+				if (!$ok) {
+					nntp_log("POST not accepted for $id: " . trim((string)$resp));
+				}
+			} else {
+				nntp_log("server refused POST for $id: " . trim((string)$resp));
+			}
 		}
 
 		fputs($s, "QUIT\r\n");
@@ -197,6 +224,10 @@ function post2nntp($post, $msgid) {
 	$headers['Date'] = time();
 	$headers['Subject'] = !empty($post['subject']) ? $post['subject'] : "None";
 	$headers['From'] = (!empty($post['name']) ? $post['name'] : 'Anonymous') . " <poster@" . $config['nntpchan']['domain'] . ">";
+	// Origin trace + MIME marker so reader-style hubs (which expect a full article,
+	// not a bare body) store what we send.
+	$headers['Path'] = nntp_header_safe($config['nntpchan']['domain']);
+	$headers['Mime-Version'] = '1.0';
 
 	if (($post['email'] ?? '') == 'sage') {
 		$headers['X-Sage'] = 'true';
