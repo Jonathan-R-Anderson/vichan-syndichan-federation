@@ -325,10 +325,11 @@ function nntpchan_ingest_article($raw, $board_uri) {
 		}
 	}
 
-	// Federated source attribution: append the sender's X-Source-Label badge and embedded
-	// source-watermark image to the rendered body. Values are escaped in the helper (Twig
-	// autoescape is off and the body is emitted raw). Returns '' when there is no attribution.
-	$post['body'] .= nntpchan_source_attribution_html($h, $parsed['body']);
+	// Federated source attribution: prepend the sender's X-Source-Label badge and embedded
+	// source-watermark image to the rendered body. Prepended (not appended) so it survives
+	// truncate_body() on the index/overboard previews and shows on every view. Values are
+	// escaped in the helper (Twig autoescape is off, body emitted raw); '' when absent.
+	$post['body'] = nntpchan_source_attribution_html($h, $parsed['body']) . $post['body'];
 
 	$id = post($post);
 	$post['id'] = $id;
