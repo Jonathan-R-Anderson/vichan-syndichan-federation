@@ -325,6 +325,11 @@ function nntpchan_ingest_article($raw, $board_uri) {
 		}
 	}
 
+	// Federated source attribution: append the sender's X-Source-Label badge and embedded
+	// source-watermark image to the rendered body. Values are escaped in the helper (Twig
+	// autoescape is off and the body is emitted raw). Returns '' when there is no attribution.
+	$post['body'] .= nntpchan_source_attribution_html($h, $parsed['body']);
+
 	$id = post($post);
 	$post['id'] = $id;
 
@@ -426,6 +431,94 @@ function nntpchan_mime_parts($contentType, $body) {
 		$parts[] = ['type' => $type, 'name' => $name, 'data' => rtrim($data, "\r\n"), 'disposition' => $disposition];
 	}
 	return $parts;
+}
+
+/**
+ * Save the inbound "source-watermark" MIME part (the attribution image other software
+ * embeds) as a deduplicated static file and return its web URL, or null if the article has
+ * no usable watermark. Deduped by SHA-256 so many posts from one source share one file.
+ */
+function nntpchan_save_source_watermark($headers, $body) {
+	global $config;
+
+	$ct = isset($headers['content-type']) ? $headers['content-type'] : '';
+	if (stripos($ct, 'multipart/') === false) {
+		return null;
+	}
+	$map = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/gif' => 'gif', 'image/webp' => 'webp'];
+
+	foreach (nntpchan_mime_parts($ct, $body) as $part) {
+		$name = isset($part['name']) ? $part['name'] : '';
+		$disp = isset($part['disposition']) ? $part['disposition'] : '';
+		// Same identification the ingest attachment-skip uses: the "source-watermark"
+		// filename token, or a bare inline image part.
+		$is_wm = (stripos($name, 'source-watermark') !== false)
+			|| ($disp === 'inline' && stripos($part['type'], 'image/') === 0);
+		if (!$is_wm) {
+			continue;
+		}
+
+		$data = $part['data'];
+		if ($data === '' || strlen($data) > 262144) { // empty or > 256 KB
+			return null;
+		}
+		$type = strtolower(trim(explode(';', $part['type'])[0]));
+		$ext = $map[$type] ?? null;
+		if ($ext === null) {
+			$e = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+			$ext = in_array($e, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true) ? ($e === 'jpeg' ? 'jpg' : $e) : null;
+		}
+		// Must be a genuine image (matches maniwani's content-signature check).
+		if ($ext === null || @getimagesizefromstring($data) === false) {
+			return null;
+		}
+
+		$dir = 'static/nntp-watermarks';
+		$rel = $dir . '/' . hash('sha256', $data) . '.' . $ext;
+		if (!is_dir($dir)) {
+			@mkdir($dir, 0755, true);
+		}
+		if (!is_file($rel)) {
+			if (@file_put_contents($rel, $data) === false) {
+				nntp_log("could not save source watermark to $rel");
+				return null;
+			}
+			@chmod($rel, 0644);
+		}
+		return (isset($config['root']) ? $config['root'] : '/') . $rel;
+	}
+	return null;
+}
+
+/**
+ * Build the escaped source-attribution HTML appended to an ingested post's body: a badge
+ * with the X-Source-Label and the embedded source-watermark image (falling back to the
+ * X-Source-Watermark URL header). Returns '' when the article carries no attribution.
+ */
+function nntpchan_source_attribution_html($headers, $body) {
+	$label = isset($headers['x-source-label']) ? trim($headers['x-source-label']) : '';
+
+	$wm_url = nntpchan_save_source_watermark($headers, $body);
+	if ($wm_url === null) {
+		$hdr = isset($headers['x-source-watermark']) ? trim($headers['x-source-watermark']) : '';
+		$wm_url = preg_match('#^https?://#i', $hdr) ? $hdr : '';
+	}
+
+	if ($label === '' && $wm_url === '') {
+		return '';
+	}
+
+	$label_e = htmlspecialchars(mb_substr($label, 0, 128), ENT_QUOTES, 'UTF-8');
+	$out = '<div class="nntp-source">';
+	if ($wm_url !== '') {
+		$url_e = htmlspecialchars($wm_url, ENT_QUOTES, 'UTF-8');
+		$out .= '<img class="nntp-watermark" src="' . $url_e . '" alt=""' . ($label_e !== '' ? ' title="' . $label_e . '"' : '') . '>';
+	}
+	if ($label_e !== '') {
+		$out .= '<span class="nntp-source-label">' . _('via') . ' ' . $label_e . '</span>';
+	}
+	$out .= '</div>';
+	return $out;
 }
 
 /**

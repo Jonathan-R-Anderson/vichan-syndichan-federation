@@ -27,28 +27,34 @@ watchlist.render = function(reset) {
 	//Read the watchlist and create a new container for each thread.
 	JSON.parse(localStorage.watchlist).forEach(function(e, i) {
 		//look at line 69, that's what (e) is here.
-		threads.push('<div class="watchlist-inner" id="watchlist-'+i+'">' +
-		'<span>/'+e[0]+'/ - ' +
-		'<a href="'+e[3]+'">'+e[1].replace("thread_", _("Thread #"))+'</a>' +
-		' ('+e[2]+') </span>' +
-		'<a class="watchlist-remove">X</a>'+
-	'</div>');
+		// Build with DOM methods, never an HTML string: e[1] (thread subject) and e[3]
+		// (thread url) are other users' content and must not be parsed as markup.
+		var link = $('<a>').attr('href', e[3]).text(e[1].replace("thread_", _("Thread #")));
+		var span = $('<span>')
+			.append(document.createTextNode('/' + e[0] + '/ - '))
+			.append(link)
+			.append(document.createTextNode(' (' + e[2] + ') '));
+		var inner = $('<div class="watchlist-inner">')
+			.attr('id', 'watchlist-' + i)
+			.append(span)
+			.append($('<a class="watchlist-remove">').text('X'));
+		threads.push(inner);
 	});
 	if ($('#watchlist').length) {
 		//If the watchlist is already there, empty it and append the threads.
 		$('#watchlist').children('.watchlist-inner').remove();
-		$('#watchlist').append(threads.join(''));
+		$('#watchlist').append(threads);
 	} else {
 		//If the watchlist has not yet been rendered, create it.
 		var menuStyle = getComputedStyle($('.boardlist')[0]);
-		$((active_page == 'ukko') ? 'hr:first' : (active_page == 'catalog') ? 'body>span:first' : 'form[name="post"]').before(
-			$('<div id="watchlist">'+
-					'<div class="watchlist-controls">'+
-						'<span><a id="clearList">['+_('Clear List')+']</a></span>&nbsp'+
-						'<span><a id="clearGhosts">['+_('Clear Ghosts')+']</a></span>'+
-					'</div>'+
-					threads.join('')+
-				'</div>').css("background-color", menuStyle.backgroundColor).css("border", menuStyle.borderBottomWidth+" "+menuStyle.borderBottomStyle+" "+menuStyle.borderBottomColor));
+		var watchlistEl = $('<div id="watchlist">'+
+				'<div class="watchlist-controls">'+
+					'<span><a id="clearList">['+_('Clear List')+']</a></span>&nbsp'+
+					'<span><a id="clearGhosts">['+_('Clear Ghosts')+']</a></span>'+
+				'</div>'+
+			'</div>').css("background-color", menuStyle.backgroundColor).css("border", menuStyle.borderBottomWidth+" "+menuStyle.borderBottomStyle+" "+menuStyle.borderBottomColor);
+		watchlistEl.append(threads);
+		$((active_page == 'ukko') ? 'hr:first' : (active_page == 'catalog') ? 'body>span:first' : 'form[name="post"]').before(watchlistEl);
 	}
 	return this;
 };

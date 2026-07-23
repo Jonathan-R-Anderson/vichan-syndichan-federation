@@ -653,10 +653,10 @@ if (active_page === 'thread' || active_page === 'index' || active_page === 'cata
 
 				$row = $('<tr>');
 				$row.append(
-					'<td>'+ typeName[obj.type] +'</td>',
-					'<td>'+ val +'</td>',
+					$('<td>').text(typeName[obj.type]),
+					$('<td>').text(val), // filter value may be another user's post name — never parse as HTML
 					$('<td>').append(
-						$('<a>').html('X')
+						$('<a>').text('X')
 							.addClass('del-btn')
 							.attr('href', '#')
 							.data('type', obj.type)
