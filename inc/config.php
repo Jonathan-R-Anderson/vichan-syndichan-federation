@@ -2044,6 +2044,11 @@
 		// inline MIME part in every federated article, so maniwani stores and serves the
 		// attribution image itself. Path to a readable image <= 256 KB (png/jpeg/gif/webp).
 		'source_watermark_file' => '', // eg. 'static/logo.png'
+		// Days a moderator-deleted thread stays blocked from re-import on the next pull
+		// (deleted-thread tombstones, keyed by the thread's root Message-ID). After the
+		// window lapses the thread may return if a peer still carries it. 0 disables.
+		// Overridable from the mod panel (?/nntpchan).
+		'tombstone_days' => 30,
 
 		// Default state of the "outbound content federation" tickbox in the mod panel
 		// (?/nntpchan): whether this node pushes its own posts out to the hub. The tickbox

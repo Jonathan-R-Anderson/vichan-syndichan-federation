@@ -1118,6 +1118,13 @@ function mod_nntpchan(Context $ctx) {
 				modLog('Removed the NNTPChan source watermark');
 				break;
 
+			case 'set_tombstone_days':
+				// Deleted-thread tombstone retention window (0 disables re-import blocking).
+				$days = max(0, min(3650, (int)($_POST['tombstone_days'] ?? 30)));
+				nntpchan_setting_set('tombstone_days', (string)$days);
+				modLog('Set NNTPChan deleted-thread block to ' . $days . ' day(s)');
+				break;
+
 			case 'sync_now':
 				// Runs synchronously; large syncs should use cron (tools/nntpchan-sync.php).
 				$sync_summary = nntpchan_sync_all();
@@ -1159,6 +1166,8 @@ function mod_nntpchan(Context $ctx) {
 			'outbound_enabled' => nntpchan_outbound_enabled(),
 			'source_label' => nntpchan_setting_get('source_label', $config['nntpchan']['source_label'] ?? ''),
 			'source_watermark_file' => nntpchan_source_watermark_file(),
+			'source_watermark_url' => $config['nntpchan']['source_watermark'] ?? '',
+			'tombstone_days' => nntpchan_tombstone_days(),
 			'sync_summary' => $sync_summary,
 			'token' => make_secure_link_token('nntpchan')
 		],

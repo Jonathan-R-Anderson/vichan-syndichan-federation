@@ -1086,6 +1086,7 @@ function deletePost($id, $error_if_doesnt_exist=true, $rebuild_after=true) {
 	}
 
 	$ids = array();
+	$deleted_op_id = null;
 
 	// Delete posts and maybe replies
 	while ($post = $query->fetch(PDO::FETCH_ASSOC)) {
@@ -1093,6 +1094,7 @@ function deletePost($id, $error_if_doesnt_exist=true, $rebuild_after=true) {
 
 		$thread_id = $post['thread'];
 		if (!$post['thread']) {
+			$deleted_op_id = (int)$post['id'];
 			// Delete thread HTML page
 			file_unlink($board['dir'] . $config['dir']['res'] . link_for($post) );
 			file_unlink($board['dir'] . $config['dir']['res'] . link_for($post, true) ); // noko50
@@ -1123,6 +1125,13 @@ function deletePost($id, $error_if_doesnt_exist=true, $rebuild_after=true) {
 	$query = prepare(sprintf("DELETE FROM ``posts_%s`` WHERE `id` = :id OR `thread` = :id", $board['uri']));
 	$query->bindValue(':id', $id, PDO::PARAM_INT);
 	$query->execute() or error(db_error($query));
+
+	// Tombstone a deleted federated thread by its root Message-ID so a later NNTP pull does
+	// not re-import it (deleted-thread tombstones). Best effort; never blocks deletion.
+	if ($deleted_op_id !== null && !empty($config['nntpchan']['enabled'])) {
+		require_once 'inc/nntpchan/nntpchan.php';
+		nntpchan_on_thread_deleted($board['uri'], $deleted_op_id, $ids);
+	}
 
 	$query = prepare("SELECT `board`, `post` FROM ``cites`` WHERE `target_board` = :board AND (`target` = " . implode(' OR `target` = ', $ids) . ") ORDER BY `board`");
 	$query->bindValue(':board', $board['uri']);

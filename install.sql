@@ -401,6 +401,25 @@ CREATE TABLE IF NOT EXISTS `nntp_settings` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `deleted_thread`
+--
+-- Deleted-thread tombstones: a moderator-deleted thread's root Message-ID is recorded here
+-- so the NNTPChan sync refuses to re-import it for a retention window (see
+-- $config['nntpchan']['tombstone_days']). Purely local state; never sent over NNTP.
+--
+
+CREATE TABLE IF NOT EXISTS `deleted_thread` (
+  `root_msgid_digest` VARCHAR(40) CHARACTER SET ascii NOT NULL,
+  `root_message_id` VARCHAR(255) CHARACTER SET ascii NOT NULL,
+  `board` VARCHAR(58) DEFAULT NULL,
+  `deleted_at` INT(11) UNSIGNED NOT NULL,
+  PRIMARY KEY (`root_msgid_digest`),
+  KEY `deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `captchas`
 --
 

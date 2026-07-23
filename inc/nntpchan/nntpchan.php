@@ -120,6 +120,128 @@ function nntpchan_source_watermark_file() {
 	return isset($config['nntpchan']['source_watermark_file']) ? $config['nntpchan']['source_watermark_file'] : '';
 }
 
+/* ---- deleted-thread tombstones (keep moderator deletions from re-importing) ---- */
+
+/**
+ * Retention window, in days, that a deleted thread stays blocked from re-import. The
+ * mod-panel override (nntp_settings) wins over the config default (30). 0 disables the
+ * whole mechanism.
+ */
+function nntpchan_tombstone_days() {
+	global $config;
+	$s = nntpchan_setting_get('tombstone_days', null);
+	if ($s !== null && $s !== '') {
+		return max(0, (int)$s);
+	}
+	return max(0, isset($config['nntpchan']['tombstone_days']) ? (int)$config['nntpchan']['tombstone_days'] : 30);
+}
+
+/**
+ * A thread's mesh-wide identity is its root Message-ID: the first token of References
+ * (the OP), or the article's own Message-ID when it is itself an OP. Derived cheaply from
+ * an XOVER row so we can gate re-import without fetching the article.
+ */
+function nntpchan_root_msgid($references, $message_id) {
+	$references = trim((string)$references);
+	if ($references !== '') {
+		$refs = array_values(array_filter(preg_split('/\s+/', $references)));
+		if (!empty($refs)) {
+			return $refs[0];
+		}
+	}
+	return trim((string)$message_id);
+}
+
+/** Is this thread root currently tombstoned (deleted within the retention window)? */
+function nntpchan_thread_tombstoned($root_msgid) {
+	$root_msgid = trim((string)$root_msgid);
+	if ($root_msgid === '') {
+		return false;
+	}
+	$days = nntpchan_tombstone_days();
+	if ($days <= 0) {
+		return false;
+	}
+	$cutoff = time() - $days * 86400;
+	try {
+		$q = prepare("SELECT 1 FROM ``deleted_thread`` WHERE `root_msgid_digest` = :d AND `deleted_at` >= :cutoff");
+		$q->bindValue(':d', sha1($root_msgid));
+		$q->bindValue(':cutoff', $cutoff, PDO::PARAM_INT);
+		$q->execute();
+		return (bool)$q->fetch();
+	} catch (PDOException $e) {
+		return false; // table absent on installs predating this feature
+	}
+}
+
+/** Record (or refresh) a tombstone for a thread root. */
+function nntpchan_tombstone_thread($root_msgid, $board = null) {
+	$root_msgid = trim((string)$root_msgid);
+	if ($root_msgid === '') {
+		return;
+	}
+	try {
+		$q = prepare("INSERT INTO ``deleted_thread`` (`root_msgid_digest`, `root_message_id`, `board`, `deleted_at`) VALUES (:d, :m, :b, :t) ON DUPLICATE KEY UPDATE `deleted_at` = :t2");
+		$q->bindValue(':d', sha1($root_msgid));
+		$q->bindValue(':m', $root_msgid);
+		$q->bindValue(':b', $board);
+		$q->bindValue(':t', time(), PDO::PARAM_INT);
+		$q->bindValue(':t2', time(), PDO::PARAM_INT);
+		$q->execute();
+	} catch (PDOException $e) {
+		nntp_log("could not tombstone thread $root_msgid: " . $e->getMessage());
+	}
+}
+
+/**
+ * Hook run when a thread (OP) is deleted. If the thread had an NNTP identity, tombstone
+ * its root Message-ID and drop the provenance rows for its posts, so the tombstone window
+ * — not a permanent reference — governs whether the thread may return later.
+ */
+function nntpchan_on_thread_deleted($board_uri, $op_id, array $ids) {
+	try {
+		$q = prepare("SELECT `message_id` FROM ``nntp_references`` WHERE `board` = :b AND `id` = :id");
+		$q->bindValue(':b', $board_uri);
+		$q->bindValue(':id', (int)$op_id, PDO::PARAM_INT);
+		$q->execute();
+		$row = $q->fetch(PDO::FETCH_ASSOC);
+	} catch (PDOException $e) {
+		return; // nntp tables absent
+	}
+	if (!$row) {
+		return; // never federated — cannot be re-imported, nothing to tombstone
+	}
+	nntpchan_tombstone_thread($row['message_id'], $board_uri);
+
+	if (!empty($ids)) {
+		$in = implode(',', array_map('intval', $ids));
+		try {
+			$d = prepare("DELETE FROM ``nntp_references`` WHERE `board` = :b AND `id` IN ($in)");
+			$d->bindValue(':b', $board_uri);
+			$d->execute();
+		} catch (PDOException $e) {
+			// best effort
+		}
+	}
+}
+
+/** Delete tombstones older than the retention window. Returns the number removed. */
+function nntpchan_sweep_tombstones() {
+	$days = nntpchan_tombstone_days();
+	if ($days <= 0) {
+		return 0;
+	}
+	$cutoff = time() - $days * 86400;
+	try {
+		$q = prepare("DELETE FROM ``deleted_thread`` WHERE `deleted_at` < :cutoff");
+		$q->bindValue(':cutoff', $cutoff, PDO::PARAM_INT);
+		$q->execute();
+		return $q->rowCount();
+	} catch (PDOException $e) {
+		return 0;
+	}
+}
+
 function gen_msgid($board, $id) {
 	global $config;
 

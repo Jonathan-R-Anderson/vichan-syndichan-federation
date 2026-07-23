@@ -32,6 +32,11 @@
 	<p class="unimportant" style="word-wrap:break-word">
 		{% trans 'Stamped onto every federated post. maniwani shows the label as a badge and stores the watermark image locally to attribute posts back to this site; other software ignores it. The watermark rides along inline in each article, kept separate from the post\'s own image.' %}
 	</p>
+	{% if outbound_enabled and not source_watermark_file and not source_watermark_url %}
+		<p style="color:#a00;font-weight:bold;word-wrap:break-word">
+			{% trans 'Outbound federation is on but no watermark is set. Instances that require a watermark on imported posts will drop your posts — upload one below.' %}
+		</p>
+	{% endif %}
 	<form action="?/nntpchan" method="post" enctype="multipart/form-data" style="margin:0">
 		<input type="hidden" name="token" value="{{ token }}">
 		<input type="hidden" name="action" value="save_source">
@@ -174,6 +179,21 @@
 		<input type="hidden" name="token" value="{{ token }}">
 		<input type="hidden" name="action" value="sync_now">
 		<input type="submit" value="{% trans 'Sync now' %}">
+	</form>
+</fieldset>
+
+<fieldset>
+	<legend>{% trans 'Deleted-thread tombstones' %}</legend>
+	<p class="unimportant" style="word-wrap:break-word">
+		{% trans 'When a moderator deletes an imported thread, its root Message-ID is tombstoned so the sync will not re-import it. After the window lapses the thread may return if a peer still carries it. Purely local — never sent over NNTP. Set to 0 to disable.' %}
+	</p>
+	<form action="?/nntpchan" method="post" style="margin:0">
+		<input type="hidden" name="token" value="{{ token }}">
+		<input type="hidden" name="action" value="set_tombstone_days">
+		<label>{% trans 'Deleted-thread block (days):' %}
+			<input type="number" name="tombstone_days" min="0" max="3650" value="{{ tombstone_days }}" style="width:80px">
+		</label>
+		<button type="submit">{% trans 'Save' %}</button>
 	</form>
 </fieldset>
 

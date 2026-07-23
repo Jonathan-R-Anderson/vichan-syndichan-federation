@@ -526,6 +526,11 @@ function nntpchan_pull_group(NNTPClient $client, $newsgroup, $board_uri) {
 		if (nntpchan_have_article($row['message_id'])) {
 			continue;
 		}
+		// Skip threads a local moderator deleted (tombstoned within the retention window).
+		// The root id comes from the XOVER References field, so no article fetch is needed.
+		if (nntpchan_thread_tombstoned(nntpchan_root_msgid($row['references'], $row['message_id']))) {
+			continue;
+		}
 		$raw = $client->article($row['message_id']);
 		if ($raw === null) {
 			continue;
@@ -577,6 +582,9 @@ function nntpchan_sync_all() {
 	if (empty($config['nntpchan']['enabled'])) {
 		return [];
 	}
+	// Expire deleted-thread tombstones past the retention window before pulling.
+	nntpchan_sweep_tombstones();
+
 	$summaries = [];
 	foreach (nntpchan_peers(true) as $peer) {
 		$summaries[] = nntpchan_sync_peer($peer);
