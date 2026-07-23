@@ -19,6 +19,38 @@ function nntp_header_safe($val) {
 	return trim(preg_replace('/[\r\n]+/', ' ', (string)$val));
 }
 
+/**
+ * Best-effort MIME type for an attachment. vichan usually supplies the browser-reported
+ * type, but API/CLI/edge paths can leave it empty or a generic application/octet-stream,
+ * which pullers do not render as an image. Sniff the actual bytes, then fall back to the
+ * file extension.
+ */
+function nntp_guess_mime($path, $data) {
+	// vichan stores uploads as <id>.<ext> with the extension already validated against
+	// allowed_ext, so the extension is authoritative — and it avoids libmagic's occasional
+	// false positives (e.g. classifying arbitrary bytes as image/x-tga).
+	$map = array(
+		'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+		'gif' => 'image/gif', 'webp' => 'image/webp', 'bmp' => 'image/bmp',
+		'mp4' => 'video/mp4', 'webm' => 'video/webm', 'pdf' => 'application/pdf',
+	);
+	$ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+	if (isset($map[$ext])) {
+		return $map[$ext];
+	}
+	if (function_exists('finfo_open')) {
+		$f = @finfo_open(FILEINFO_MIME_TYPE);
+		if ($f) {
+			$m = @finfo_buffer($f, $data);
+			@finfo_close($f);
+			if ($m && strcasecmp($m, 'application/octet-stream') !== 0) {
+				return $m;
+			}
+		}
+	}
+	return 'application/octet-stream';
+}
+
 /* ---- runtime NNTPChan toggles (nntp_settings table, set from the mod panel) ---- */
 
 /** Read a runtime setting, memoised for the request. Returns $default if unset. */
@@ -89,25 +121,35 @@ function gen_nntp($headers, $files) {
 	else {
 		$boundary = sha1($headers['Message-Id']);
 		$content = "";
-		$headers['Content-Type'] = "multipart/mixed; boundary=$boundary";
+		$headers['Content-Type'] = "multipart/mixed; boundary=\"$boundary\"";
 		foreach ($files as $file) {
-			$content .= "--$boundary\r\n";
-			if (isset($file['name'])) {
-				$file['name'] = preg_replace('/[\r\n\0"]/', '', $file['name']);
-				$content .= "Content-Disposition: form-data; filename=\"$file[name]\"; name=\"attachment\"\r\n";
-			}
 			$type = explode('/', $file['type'])[0];
+			$ctype = $file['type'];
 			if ($type == 'text') {
-				$file['type'] .= '; charset=UTF-8';
+				$ctype .= '; charset=UTF-8';
 			}
-			$content .= "Content-Type: $file[type]\r\n";
+			$content .= "--$boundary\r\n";
+			$content .= "Content-Type: $ctype\r\n";
 			if ($type != 'text' && $type != 'message') {
-				$file['text'] = base64_encode($file['text']);
+				// Binary parts: base64 wrapped at 76 columns (RFC 2045). An unwrapped
+				// blob is one enormous line that violates the news 998-octet limit and
+				// makes standards-compliant pullers show "no image"; the disposition
+				// must be a real "attachment", not the HTTP-form "form-data".
 				$content .= "Content-Transfer-Encoding: base64\r\n";
+				if (isset($file['name'])) {
+					$fname = preg_replace('/[\r\n\0"]/', '', $file['name']);
+					$content .= "Content-Disposition: attachment; filename=\"$fname\"\r\n";
+				}
+				$content .= "\r\n";
+				$content .= rtrim(chunk_split(base64_encode($file['text']), 76, "\r\n"), "\r\n");
+				$content .= "\r\n";
 			}
-			$content .= "\r\n";
-			$content .= $file['text'];
-			$content .= "\r\n";
+			else {
+				$content .= "Content-Transfer-Encoding: 8bit\r\n";
+				$content .= "\r\n";
+				$content .= $file['text'];
+				$content .= "\r\n";
+			}
 		}
 		$content .= "--$boundary--\r\n";
 
@@ -283,9 +325,14 @@ function post2nntp($post, $msgid) {
 			if (empty($file['file_path']) || !is_readable($file['file_path'])) {
 				continue;
 			}
+			$data = file_get_contents($file['file_path']);
+			$type = isset($file['type']) ? $file['type'] : '';
+			if ($type === '' || strcasecmp($type, 'application/octet-stream') === 0) {
+				$type = nntp_guess_mime($file['file_path'], $data);
+			}
 			$files[] = array(
-				'type' => isset($file['type']) ? $file['type'] : 'application/octet-stream',
-				'text' => file_get_contents($file['file_path']),
+				'type' => $type,
+				'text' => $data,
 				'name' => isset($file['name']) ? $file['name'] : basename($file['file_path']),
 			);
 		}
