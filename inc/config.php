@@ -2033,6 +2033,14 @@
 		 */
 		'group' => false, // eg. 'overchan.test'
 
+		// Source attribution stamped onto every outbound article. maniwani renders these
+		// as a "source" badge + watermark on imported posts; other nntpchan software just
+		// ignores the unknown X- headers. The label falls back to $config['sitetitle'] when
+		// left blank. The watermark is only sent when it is an absolute http(s) URL to a
+		// small image (e.g. your favicon) — maniwani rejects non-http values.
+		'source_label' => '',
+		'source_watermark' => '', // eg. 'https://example.org/favicon.ico'
+
 		// Default state of the "outbound content federation" tickbox in the mod panel
 		// (?/nntpchan): whether this node pushes its own posts out to the hub. The tickbox
 		// stores a runtime override in the nntp_settings table; this is the fallback used

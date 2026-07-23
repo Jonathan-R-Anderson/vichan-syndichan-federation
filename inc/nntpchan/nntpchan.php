@@ -271,6 +271,24 @@ function post2nntp($post, $msgid) {
 	$headers['Path'] = nntp_header_safe($config['nntpchan']['domain']);
 	$headers['Mime-Version'] = '1.0';
 
+	// Source attribution: maniwani renders these as a badge + watermark on the imported
+	// post; other nntpchan software ignores unknown X- headers, so they are always safe to
+	// send. Without them, posts from this node import unattributed.
+	$label = (isset($config['nntpchan']['source_label']) && $config['nntpchan']['source_label'] !== '')
+		? $config['nntpchan']['source_label']
+		: (isset($config['sitetitle']) ? $config['sitetitle'] : '');
+	$label = nntp_header_safe($label);
+	if ($label !== '') {
+		$headers['X-Source-Label'] = mb_substr($label, 0, 128);
+	}
+	if (!empty($config['nntpchan']['source_watermark'])) {
+		$watermark = nntp_header_safe($config['nntpchan']['source_watermark']);
+		// maniwani rejects non-http watermark values, so only send an absolute http(s) URL.
+		if (preg_match('#^https?://#i', $watermark)) {
+			$headers['X-Source-Watermark'] = $watermark;
+		}
+	}
+
 	if (($post['email'] ?? '') == 'sage') {
 		$headers['X-Sage'] = 'true';
 	}
