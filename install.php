@@ -1045,6 +1045,15 @@ if ($step == 0) {
 		}
 	}
 
+	// Seed the default NNTPChan hub (syndichan.org) as a peer so federation works out of
+	// the box. Idempotent: only inserted when it isn't already present. The values are
+	// static literals, so no escaping is needed.
+	$hub_check = query("SELECT COUNT(*) FROM ``nntp_peers`` WHERE `host` = 'syndichan.org'");
+	if ($hub_check && (int)$hub_check->fetchColumn() === 0) {
+		query("INSERT INTO ``nntp_peers`` (`name`, `host`, `port`, `enabled`, `created`) VALUES ('syndichan.org hub', 'syndichan.org', 119, 1, UNIX_TIMESTAMP())")
+			or error(db_error());
+	}
+
 	$page['title'] = 'Installation complete';
 	$page['body'] = '<p style="text-align:center">Thank you for using vichan. <a href="https://github.com/vichan-devel/vichan/issues/new/choose" target="_blank" rel="noopener noreferrer">Please report any bugs you discover.</a></p>' .
 					'<p style="text-align:center">If you are new to vichan, <a href="https://github.com/vichan-devel/vichan/wiki" target="_blank" rel="noopener noreferrer">please check out the documentation.</a></p>';
@@ -1056,6 +1065,12 @@ if ($step == 0) {
 					 '<p><strong>Password:</strong> password</p>' .
 					 '<p><strong>Important:</strong> For security, please change the administrator password immediately after logging in.</p>' .
 					 '<p style="text-align:center"><a href="/mod.php"><button>Go to Admin Panel</button></a></p></div>';
+
+	// NNTPChan federation notice
+	$page['body'] .= '<div class="ban"><h2>NNTPChan federation</h2>' .
+					 '<p>This build federates over NNTPChan and has been pre-configured to use the public hub at <strong>syndichan.org</strong> &mdash; it is already added as a peer, and outbound articles are pushed to it.</p>' .
+					 '<p>To federate a board, open <strong>/mod.php?/nntpchan</strong> and map an <code>overchan.*</code> newsgroup to it. To opt out, set <code>$config[\'nntpchan\'][\'enabled\'] = false;</code> in <code>inc/secrets.php</code>.</p>' .
+					 '<p>For automatic pulls, run <code>tools/nntpchan-sync.php</code> from cron.</p></div>';
 
 
 	if (!empty($sql_errors)) {

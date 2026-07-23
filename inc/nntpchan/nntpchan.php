@@ -23,7 +23,11 @@ function gen_msgid($board, $id) {
 	global $config;
 
 	$b = preg_replace("/[^0-9a-zA-Z$]/", 'x', $board);
-	$salt = sha1($board . "|" . $id . "|" . $config['nntpchan']['salt']);
+	// Mix in the per-install secure_trip_salt so two nodes never generate the same
+	// message-id for the same board/post, even with the default nntpchan salt/domain.
+	// This keeps articles from colliding (and being rejected) on a shared hub.
+	$node_salt = $config['nntpchan']['salt'] . '|' . (isset($config['secure_trip_salt']) ? $config['secure_trip_salt'] : '');
+	$salt = sha1($board . "|" . $id . "|" . $node_salt);
 	$salt = substr($salt, 0, 7);
 	$salt = base_convert($salt, 16, 36);
 

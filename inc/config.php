@@ -1995,15 +1995,19 @@
  */
 
 /*
- * Please keep in mind that NNTPChan support in vichan isn't finished yet / is in an experimental
- * state. Please join #nntpchan on Rizon in order to peer with someone.
+ * This build federates over NNTPChan and is pre-configured to use the public hub at
+ * syndichan.org out of the box. The hub is added as a peer automatically at install
+ * (see install.sql), and outbound articles are pushed to it. To finish wiring a board
+ * into the mesh, map an overchan.* newsgroup to it from the mod panel (?/nntpchan);
+ * to opt out entirely, set 'enabled' to false.
  */
 
 	$config['nntpchan'] = [
-		// Enable NNTPChan integration
-		'enabled'=> false,
-		// NNTP server
-		'server' => "localhost:1119",
+		// Enable NNTPChan integration (on by default for this federated build).
+		'enabled'=> true,
+		// NNTP hub that outbound articles are pushed to. Defaults to the public syndichan.org
+		// hub; the same host is seeded as a pull peer at install.
+		'server' => "syndichan.org:119",
 		// Socket timeout (seconds) when broadcasting to the NNTP server. Federation is
 		// best-effort: an unreachable/slow peer is logged and never breaks local posting.
 		'timeout' => 5,
@@ -2033,7 +2037,8 @@
 
 		// Minutes between background pull syncs from peers (0 disables). Drive it from cron
 		// via tools/nntpchan-sync.php; a "Sync now" button in the panel runs it on demand.
-		'sync_interval' => 0,
+		// Non-zero by default so the seeded syndichan.org hub peer is polled once set up.
+		'sync_interval' => 30,
 		// Newsgroup that carries federated image-ban control messages.
 		'banlist_group' => 'overchan.imgban',
 		// This node's identifier, used in federated ban messages.
