@@ -48,3 +48,7 @@ favicon.ico
 /local-instances
 
 /vendor/
+
+# self-update runtime
+self-update.log
+.self-update.lock
