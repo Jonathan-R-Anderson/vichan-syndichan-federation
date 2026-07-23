@@ -1079,6 +1079,45 @@ function mod_nntpchan(Context $ctx) {
 				modLog(($on ? 'Enabled' : 'Disabled') . ' outbound content federation');
 				break;
 
+			case 'save_source':
+				// Source attribution: badge label + optional watermark image embedded in
+				// every federated article (see post2nntp / gen_nntp).
+				nntpchan_setting_set('source_label', mb_substr(trim($_POST['source_label'] ?? ''), 0, 128));
+
+				if (isset($_FILES['watermark']) && ($_FILES['watermark']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+					if ($_FILES['watermark']['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($_FILES['watermark']['tmp_name']))
+						error(_('The watermark upload failed.'));
+					if ($_FILES['watermark']['size'] > 262144)
+						error(_('The watermark image must be 256 KB or smaller.'));
+					$info = @getimagesize($_FILES['watermark']['tmp_name']);
+					$extmap = [IMAGETYPE_PNG => 'png', IMAGETYPE_JPEG => 'jpg', IMAGETYPE_GIF => 'gif', IMAGETYPE_WEBP => 'webp'];
+					if ($info === false || !isset($extmap[$info[2]]))
+						error(_('The watermark must be a PNG, JPEG, GIF, or WebP image.'));
+					if (!is_dir('static') || !is_writable('static'))
+						error(_('Cannot save the watermark: the static/ directory is not writable.'));
+					// Replace any previous watermark (possibly a different extension).
+					foreach ($extmap as $e)
+						@unlink("static/nntpchan-watermark.$e");
+					$dest = 'static/nntpchan-watermark.' . $extmap[$info[2]];
+					if (!@move_uploaded_file($_FILES['watermark']['tmp_name'], $dest))
+						error(_('Could not write the watermark image to static/.'));
+					@chmod($dest, 0644);
+					nntpchan_setting_set('source_watermark_file', $dest);
+					modLog('Uploaded an NNTPChan source watermark');
+				}
+				modLog('Updated NNTPChan source attribution');
+				break;
+
+			case 'remove_watermark':
+				$cur = nntpchan_setting_get('source_watermark_file', '');
+				if (strpos($cur, 'static/nntpchan-watermark.') === 0)
+					@unlink($cur);
+				foreach (['png', 'jpg', 'gif', 'webp'] as $e)
+					@unlink("static/nntpchan-watermark.$e");
+				nntpchan_setting_set('source_watermark_file', '');
+				modLog('Removed the NNTPChan source watermark');
+				break;
+
 			case 'sync_now':
 				// Runs synchronously; large syncs should use cron (tools/nntpchan-sync.php).
 				$sync_summary = nntpchan_sync_all();
@@ -1118,6 +1157,8 @@ function mod_nntpchan(Context $ctx) {
 			'boards' => listBoards(),
 			'ban_count' => $ban_count,
 			'outbound_enabled' => nntpchan_outbound_enabled(),
+			'source_label' => nntpchan_setting_get('source_label', $config['nntpchan']['source_label'] ?? ''),
+			'source_watermark_file' => nntpchan_source_watermark_file(),
 			'sync_summary' => $sync_summary,
 			'token' => make_secure_link_token('nntpchan')
 		],

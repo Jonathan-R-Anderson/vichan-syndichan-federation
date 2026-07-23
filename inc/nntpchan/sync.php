@@ -376,9 +376,11 @@ function nntpchan_extract_attachments($headers, $body) {
 		if (stripos($part['type'], 'text/') === 0 || stripos($part['type'], 'message/') === 0) {
 			continue;
 		}
-		// "inline" parts are source watermarks (attribution), not post content — importing
-		// them as the post's image would duplicate the sender's logo onto every post.
-		if (isset($part['disposition']) && $part['disposition'] === 'inline') {
+		// Source watermarks are attribution, not post content — importing one as the post's
+		// image would stamp the sender's logo on every post. Identify it by the spec's
+		// canonical "source-watermark" filename token, or a bare inline disposition.
+		if ((isset($part['name']) && stripos($part['name'], 'source-watermark') !== false)
+			|| (isset($part['disposition']) && $part['disposition'] === 'inline')) {
 			continue;
 		}
 		$out[] = $part;

@@ -27,6 +27,41 @@
 	</form>
 </fieldset>
 
+<fieldset>
+	<legend>{% trans 'Source attribution' %}</legend>
+	<p class="unimportant" style="word-wrap:break-word">
+		{% trans 'Stamped onto every federated post. maniwani shows the label as a badge and stores the watermark image locally to attribute posts back to this site; other software ignores it. The watermark rides along inline in each article, kept separate from the post\'s own image.' %}
+	</p>
+	<form action="?/nntpchan" method="post" enctype="multipart/form-data" style="margin:0">
+		<input type="hidden" name="token" value="{{ token }}">
+		<input type="hidden" name="action" value="save_source">
+		<p style="margin:0 0 6px">
+			<label>{% trans 'Source label (badge text):' %}
+				<input type="text" name="source_label" size="24" value="{{ source_label|e }}" placeholder="{{ config.sitetitle|e }}">
+			</label>
+		</p>
+		<p style="margin:0 0 6px">
+			{% if source_watermark_file %}
+				{% trans 'Current watermark:' %}
+				<img src="{{ config.root }}{{ source_watermark_file|e }}" alt="watermark" style="height:32px;vertical-align:middle;border:1px solid #999">
+				<code>{{ source_watermark_file|e }}</code>
+			{% else %}
+				<span class="unimportant">{% trans 'No watermark image set — posts carry the label badge only.' %}</span>
+			{% endif %}
+		</p>
+		<label>{% trans 'Watermark image:' %} <input type="file" name="watermark" accept="image/png,image/jpeg,image/gif,image/webp"></label>
+		<span class="unimportant">({% trans 'PNG/JPEG/GIF/WebP, 256 KB max' %})</span>
+		<button type="submit">{% trans 'Save' %}</button>
+	</form>
+	{% if source_watermark_file %}
+		<form action="?/nntpchan" method="post" style="margin-top:6px" onsubmit="return confirm('{% trans 'Remove the watermark image?' %}');">
+			<input type="hidden" name="token" value="{{ token }}">
+			<input type="hidden" name="action" value="remove_watermark">
+			<button type="submit">{% trans 'Remove watermark' %}</button>
+		</form>
+	{% endif %}
+</fieldset>
+
 {% if sync_summary is not null %}
 	<fieldset>
 		<legend>{% trans 'Sync result' %}</legend>

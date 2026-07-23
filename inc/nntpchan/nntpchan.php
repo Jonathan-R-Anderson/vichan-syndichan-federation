@@ -91,6 +91,35 @@ function nntpchan_outbound_enabled() {
 	return nntpchan_setting_get('outbound_enabled', $default) === '1';
 }
 
+/**
+ * Source-attribution badge text: the mod-panel override (nntp_settings) wins, then the
+ * config default, then the site title.
+ */
+function nntpchan_source_label() {
+	global $config;
+	$s = nntpchan_setting_get('source_label', null);
+	if ($s !== null && $s !== '') {
+		return $s;
+	}
+	if (!empty($config['nntpchan']['source_label'])) {
+		return $config['nntpchan']['source_label'];
+	}
+	return isset($config['sitetitle']) ? $config['sitetitle'] : '';
+}
+
+/**
+ * Path to the local watermark image embedded inline in every federated article. The
+ * mod-panel upload (nntp_settings) wins over the config default; '' means none.
+ */
+function nntpchan_source_watermark_file() {
+	global $config;
+	$s = nntpchan_setting_get('source_watermark_file', null);
+	if ($s !== null && $s !== '') {
+		return $s;
+	}
+	return isset($config['nntpchan']['source_watermark_file']) ? $config['nntpchan']['source_watermark_file'] : '';
+}
+
 function gen_msgid($board, $id) {
 	global $config;
 
@@ -277,10 +306,7 @@ function post2nntp($post, $msgid) {
 	// Source attribution: maniwani renders these as a badge + watermark on the imported
 	// post; other nntpchan software ignores unknown X- headers, so they are always safe to
 	// send. Without them, posts from this node import unattributed.
-	$label = (isset($config['nntpchan']['source_label']) && $config['nntpchan']['source_label'] !== '')
-		? $config['nntpchan']['source_label']
-		: (isset($config['sitetitle']) ? $config['sitetitle'] : '');
-	$label = nntp_header_safe($label);
+	$label = nntp_header_safe(nntpchan_source_label());
 	if ($label !== '') {
 		$headers['X-Source-Label'] = mb_substr($label, 0, 128);
 	}
@@ -362,7 +388,7 @@ function post2nntp($post, $msgid) {
 	// Source watermark: embed a small local image inline so maniwani stores and serves the
 	// attribution image itself. Appended after the post's own attachments so the post image
 	// stays the "first usable attachment". Skipped if unset, unreadable, empty, or > 256 KB.
-	$wfile = isset($config['nntpchan']['source_watermark_file']) ? $config['nntpchan']['source_watermark_file'] : '';
+	$wfile = nntpchan_source_watermark_file();
 	if ($wfile !== '' && is_readable($wfile)) {
 		$wdata = file_get_contents($wfile);
 		if ($wdata !== false && strlen($wdata) > 0 && strlen($wdata) <= 262144) {
