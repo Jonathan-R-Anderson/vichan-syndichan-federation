@@ -702,22 +702,68 @@ function mod_captcha(Context $ctx) {
 	if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$action = isset($_POST['action']) ? $_POST['action'] : '';
 
+		// Parse a textarea of image URLs (one per line) into a clean, deduplicated list.
+		$parse_urls = function ($text) {
+			$out = [];
+			foreach (preg_split('/\r\n|\r|\n/', (string)$text) as $line) {
+				$line = trim($line);
+				if ($line !== '' && preg_match('#^(https?://|/)#i', $line)) {
+					$out[$line] = true;
+				}
+			}
+			return array_keys($out);
+		};
+
 		switch ($action) {
-			case 'add_category':
+			case 'new_set':
 				$name = strtolower(preg_replace('/[^a-z0-9_.-]/i', '', trim($_POST['name'] ?? '')));
 				$prompt = trim($_POST['prompt'] ?? '');
 				if ($name === '')
-					error(_('A category name (letters, digits, . _ -) is required.'));
+					error(_('A set name (letters, digits, . _ -) is required.'));
 				$q = prepare('INSERT INTO `captcha_categories` (`name`, `prompt`, `created_at`) VALUES (:n, :p, :t) ON DUPLICATE KEY UPDATE `prompt` = :p2');
 				$q->bindValue(':n', $name);
-				$q->bindValue(':p', $prompt);
-				$q->bindValue(':p2', $prompt);
+				$q->bindValue(':p', mb_substr($prompt, 0, 255));
+				$q->bindValue(':p2', mb_substr($prompt, 0, 255));
 				$q->bindValue(':t', time());
 				$q->execute() or error(db_error($q));
-				modLog('Saved captcha category ' . $name);
+				modLog('Created captcha set ' . $name);
 				break;
 
-			case 'delete_category':
+			case 'update_set':
+				$name = strtolower(preg_replace('/[^a-z0-9_.-]/i', '', trim($_POST['name'] ?? '')));
+				if ($name === '')
+					error(_('A set name is required.'));
+				$prompt = trim($_POST['prompt'] ?? '');
+				$matching = $parse_urls($_POST['matching'] ?? '');
+				$decoys = $parse_urls($_POST['decoys'] ?? '');
+
+				$q = prepare('INSERT INTO `captcha_categories` (`name`, `prompt`, `created_at`) VALUES (:n, :p, :t) ON DUPLICATE KEY UPDATE `prompt` = :p2');
+				$q->bindValue(':n', $name);
+				$q->bindValue(':p', mb_substr($prompt, 0, 255));
+				$q->bindValue(':p2', mb_substr($prompt, 0, 255));
+				$q->bindValue(':t', time());
+				$q->execute() or error(db_error($q));
+
+				// Replace the set's image pool with the two submitted URL lists.
+				$del = prepare('DELETE FROM `captcha_grid_images` WHERE `category` = :n');
+				$del->bindValue(':n', $name);
+				$del->execute() or error(db_error($del));
+
+				$ins = prepare("INSERT INTO `captcha_grid_images` (`category`, `image_url`, `is_target`, `label`, `created_at`) VALUES (:c, :u, :t, '', :ts)");
+				$now = time();
+				foreach ([[1, $matching], [0, $decoys]] as $group) {
+					foreach ($group[1] as $u) {
+						$ins->bindValue(':c', $name);
+						$ins->bindValue(':u', $u);
+						$ins->bindValue(':t', $group[0], PDO::PARAM_INT);
+						$ins->bindValue(':ts', $now);
+						$ins->execute() or error(db_error($ins));
+					}
+				}
+				modLog('Updated captcha set ' . $name . ' (' . count($matching) . ' matching, ' . count($decoys) . ' decoy)');
+				break;
+
+			case 'delete_set':
 				$name = trim($_POST['name'] ?? '');
 				$d = prepare('DELETE FROM `captcha_categories` WHERE `name` = :n');
 				$d->bindValue(':n', $name);
@@ -725,51 +771,21 @@ function mod_captcha(Context $ctx) {
 				$d = prepare('DELETE FROM `captcha_grid_images` WHERE `category` = :n');
 				$d->bindValue(':n', $name);
 				$d->execute() or error(db_error($d));
-				modLog('Deleted captcha category ' . $name);
-				break;
-
-			case 'add_image':
-				$category = trim($_POST['category'] ?? '');
-				$image_url = trim($_POST['image_url'] ?? '');
-				$is_target = isset($_POST['is_target']) ? 1 : 0;
-				$label = trim($_POST['label'] ?? '');
-				if ($category === '' || $image_url === '')
-					error(_('A category and an image URL are required.'));
-				if (!preg_match('#^(https?://|/)#i', $image_url))
-					error(_('The image URL must start with http(s):// or a leading /.'));
-				if (isset($_POST['mirror']) && preg_match('#^https?://#i', $image_url)) {
-					$local = captcha_mirror_image($image_url, $grid_image_dir);
-					if ($local !== false) $image_url = $local;
-				}
-				$q = prepare('INSERT INTO `captcha_grid_images` (`category`, `image_url`, `is_target`, `label`, `created_at`) VALUES (:c, :u, :t, :l, :ts)');
-				$q->bindValue(':c', $category);
-				$q->bindValue(':u', $image_url);
-				$q->bindValue(':t', $is_target, PDO::PARAM_INT);
-				$q->bindValue(':l', mb_substr($label, 0, 255));
-				$q->bindValue(':ts', time());
-				$q->execute() or error(db_error($q));
-				modLog('Added a captcha image to ' . $category);
-				break;
-
-			case 'delete_image':
-				$q = prepare('DELETE FROM `captcha_grid_images` WHERE `id` = :id');
-				$q->bindValue(':id', (int)($_POST['id'] ?? 0), PDO::PARAM_INT);
-				$q->execute() or error(db_error($q));
+				modLog('Deleted captcha set ' . $name);
 				break;
 
 			case 'import':
-				// Accept a pasted CaptchaGetAll/CaptchaType JSON, or a URL to fetch it from
-				// (e.g. https://anime-captcha.vercel.app/api/getall). getall conveniently
-				// includes the answer key, which we then keep server-side.
-				$json = trim($_POST['import_json'] ?? '');
+				// Optional bulk load: fetch a leomotors-style CaptchaGetAll payload from a URL
+				// (e.g. https://anime-captcha.vercel.app/api/getall) and create the sets from it.
+				// getall includes the answer key, which we keep server-side.
 				$url = trim($_POST['import_url'] ?? '');
-				if ($json === '' && $url !== '' && preg_match('#^https?://#i', $url) && captcha_url_is_safe($url)) {
-					$hc = stream_context_create(['http' => ['timeout' => 15, 'header' => "User-Agent: Mozilla/5.0\r\n"]]);
-					$json = @file_get_contents($url, false, $hc, 0, 8 * 1024 * 1024);
-				}
+				if ($url === '' || !preg_match('#^https?://#i', $url) || !captcha_url_is_safe($url))
+					error(_('A valid http(s) URL is required.'));
+				$hc = stream_context_create(['http' => ['timeout' => 15, 'header' => "User-Agent: Mozilla/5.0\r\n"]]);
+				$json = @file_get_contents($url, false, $hc, 0, 8 * 1024 * 1024);
 				$data = json_decode((string)$json, true);
 				if (!is_array($data))
-					error(_('Could not parse the import JSON (paste a CaptchaGetAll object or an /api/getall URL).'));
+					error(_('Could not fetch or parse a challenge set from that URL.'));
 				// Normalise a single CaptchaType into a { category => type } map.
 				if (isset($data['questions']) && is_array($data['questions'])) {
 					$data = [(isset($data['category']) ? $data['category'] : 'imported') => $data];
@@ -835,18 +851,23 @@ function mod_captcha(Context $ctx) {
 		return;
 	}
 
-	$categories = query('SELECT c.`name`, c.`prompt`,
-		(SELECT COUNT(*) FROM `captcha_grid_images` g WHERE g.`category` = c.`name`) AS `total`,
-		(SELECT COUNT(*) FROM `captcha_grid_images` g WHERE g.`category` = c.`name` AND g.`is_target` = 1) AS `targets`
-		FROM `captcha_categories` c ORDER BY c.`name`') or error(db_error());
+	// Load each set with its matching / decoy image URLs (one per line) for the edit forms.
+	$categories = query('SELECT `name`, `prompt` FROM `captcha_categories` ORDER BY `name`') or error(db_error());
 	$categories = $categories->fetchAll(PDO::FETCH_ASSOC);
-
-	$images = query('SELECT * FROM `captcha_grid_images` ORDER BY `id` DESC LIMIT 200') or error(db_error());
-	$images = $images->fetchAll(PDO::FETCH_ASSOC);
-	foreach ($images as &$im) {
-		$im['delete_token'] = make_secure_link_token('captcha/delete/' . $im['id']);
+	$imgq = prepare('SELECT `image_url`, `is_target` FROM `captcha_grid_images` WHERE `category` = :n ORDER BY `id`');
+	foreach ($categories as &$c) {
+		$imgq->bindValue(':n', $c['name']);
+		$imgq->execute() or error(db_error($imgq));
+		$m = []; $d = [];
+		foreach ($imgq->fetchAll(PDO::FETCH_ASSOC) as $r) {
+			if ($r['is_target']) { $m[] = $r['image_url']; } else { $d[] = $r['image_url']; }
+		}
+		$c['matching'] = implode("\n", $m);
+		$c['decoys'] = implode("\n", $d);
+		$c['matching_count'] = count($m);
+		$c['decoy_count'] = count($d);
 	}
-	unset($im);
+	unset($c);
 
 	$ext = query("SELECT COUNT(*) FROM `captcha_grid_images` WHERE `image_url` LIKE 'http%'");
 	$external_remaining = $ext ? (int)$ext->fetchColumn() : 0;
@@ -856,7 +877,6 @@ function mod_captcha(Context $ctx) {
 		$config['file_mod_captcha'],
 		[
 			'categories' => $categories,
-			'images' => $images,
 			'external_remaining' => $external_remaining,
 			'token' => make_secure_link_token('captcha'),
 		],

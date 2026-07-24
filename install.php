@@ -1054,6 +1054,14 @@ if ($step == 0) {
 			or error(db_error());
 	}
 
+	// Map the hub's newsgroup to the default /b/ board so it auto-populates with inbound
+	// content after install. Idempotent (newsgroup is UNIQUE); /b/ is created above.
+	$map_check = query("SELECT COUNT(*) FROM ``nntp_groupmap`` WHERE `newsgroup` = 'syndichan.random'");
+	if ($map_check && (int)$map_check->fetchColumn() === 0) {
+		query("INSERT INTO ``nntp_groupmap`` (`newsgroup`, `board`) VALUES ('syndichan.random', 'b')")
+			or error(db_error());
+	}
+
 	$page['title'] = 'Installation complete';
 	$page['body'] = '<p style="text-align:center">Thank you for using vichan. <a href="https://github.com/vichan-devel/vichan/issues/new/choose" target="_blank" rel="noopener noreferrer">Please report any bugs you discover.</a></p>' .
 					'<p style="text-align:center">If you are new to vichan, <a href="https://github.com/vichan-devel/vichan/wiki" target="_blank" rel="noopener noreferrer">please check out the documentation.</a></p>';
