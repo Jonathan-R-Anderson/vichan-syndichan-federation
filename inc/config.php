@@ -1181,9 +1181,21 @@
 	// Minify Javascript using http://code.google.com/p/minify/.
 	$config['minify_js'] = false;
 
-	// Version number for main.js (or $config['url_javascript']).
-	// You can use this to bypass the user's browsers and CDN caches.
-	$config['resource_version'] = 0;
+	// Version number appended as ?v= to JS/CSS URLs to bypass browser and CDN caches.
+	// These files are served with a 1-year expiry, so a CONSTANT version means a stale script
+	// or stylesheet is served indefinitely after a deploy. Derive it from the newest JS/CSS
+	// mtime instead, so every deploy that changes any of them automatically busts the cache.
+	// (Rebuild the boards after deploying so the static pages embed the new version.)
+	$__rv = 1;
+	foreach (array_merge(
+		(array) glob(__DIR__ . '/../js/*.js'),
+		(array) glob(__DIR__ . '/../stylesheets/*.css')
+	) as $__f) {
+		$__m = @filemtime($__f);
+		if ($__m !== false && $__m > $__rv) { $__rv = $__m; }
+	}
+	$config['resource_version'] = $__rv;
+	unset($__rv, $__f, $__m);
 
 	/*
 	 * Content-Security-Policy. When set to a non-empty string it is emitted as a
