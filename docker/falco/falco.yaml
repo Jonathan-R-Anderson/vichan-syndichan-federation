@@ -1,0 +1,40 @@
+# Falco configuration for the vichan stack.
+# Mounted at /etc/falco/falco.yaml. Runtime threat detection via modern eBPF (CO-RE), so no
+# kernel headers or a compiled driver are required on the host (needs Linux >= 5.8).
+
+# Rule files, loaded in order. The default ruleset is installed by falcoctl in the official
+# image; rules.d/ holds this repo's vichan-specific rules.
+rules_files:
+  - /etc/falco/falco_rules.yaml
+  - /etc/falco/falco_rules.local.yaml
+  - /etc/falco/rules.d
+
+# Use the modern, kernel-header-free eBPF probe.
+engine:
+  kind: modern_ebpf
+
+# Emit structured JSON so the mod panel (?/falco) can parse each alert reliably.
+json_output: true
+json_include_output_property: true
+json_include_tags_property: true
+
+# Send alerts to the container log (docker logs vichan_falco) ...
+stdout_output:
+  enabled: true
+
+# ... and to a file the php container reads read-only for the admin panel.
+file_output:
+  enabled: true
+  keep_alive: false
+  filename: /var/log/falco/events.log
+
+# Only surface NOTICE and above; drop DEBUG/INFO chatter.
+priority: notice
+
+# Falco's own diagnostic logging (not security alerts).
+log_stderr: true
+log_syslog: false
+log_level: info
+
+syslog_output:
+  enabled: false

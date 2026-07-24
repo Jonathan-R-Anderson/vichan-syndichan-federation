@@ -1,0 +1,71 @@
+# vichan-specific Falco rules. These use raw event conditions (not the default ruleset's
+# macros) so they stand on their own even if the default ruleset fails to load, and they are
+# written to avoid the false positives this particular stack would otherwise generate (the php
+# container legitimately shells out to imagemagick/ffmpeg for thumbnails; healthchecks run sh).
+
+- rule: Interactive shell in vichan container
+  desc: >
+    An interactive shell (one attached to a terminal) was opened inside a vichan service
+    container. Normal operation never does this — the php container's non-interactive exec()
+    calls for thumbnailing have no tty — so an interactive shell strongly suggests hands-on
+    access via a web-shell, an RCE payload, or a container breakout.
+  condition: >
+    evt.type in (execve, execveat) and evt.dir = <
+    and container.id != host
+    and container.name startswith "vichan_"
+    and proc.tty != 0
+    and proc.name in (bash, sh, dash, ash, zsh, ksh, csh, tcsh)
+  output: >
+    Interactive shell opened in vichan container
+    (container=%container.name image=%container.image.repository user=%user.name
+    shell=%proc.name parent=%proc.pname cmdline=%proc.cmdline tty=%proc.tty)
+  priority: WARNING
+  tags: [vichan, container, shell, mitre_execution]
+
+- rule: Package management run in vichan container
+  desc: >
+    A package manager or language installer ran inside a vichan container. The images are built
+    ahead of time and never install software at runtime, so this typically means an attacker is
+    pulling in tools after gaining a foothold.
+  condition: >
+    evt.type in (execve, execveat) and evt.dir = <
+    and container.id != host
+    and container.name startswith "vichan_"
+    and proc.name in (apk, apt, apt-get, aptitude, dpkg, yum, dnf, rpm, pip, pip3, npm, gem, easy_install)
+  output: >
+    Package manager executed in vichan container
+    (container=%container.name proc=%proc.name cmdline=%proc.cmdline user=%user.name parent=%proc.pname)
+  priority: WARNING
+  tags: [vichan, container, software_mgmt, mitre_persistence]
+
+- rule: Sensitive credential file read in vichan container
+  desc: >
+    Something read a sensitive credential file inside a vichan container. Normal services never
+    touch these, so a read is a strong indicator of reconnaissance after a compromise.
+  condition: >
+    evt.type in (open, openat, openat2) and evt.dir = <
+    and container.id != host
+    and container.name startswith "vichan_"
+    and fd.name in (/etc/shadow, /etc/sudoers, /root/.ssh/id_rsa, /root/.bash_history)
+  output: >
+    Sensitive file opened in vichan container
+    (container=%container.name file=%fd.name proc=%proc.name cmdline=%proc.cmdline user=%user.name)
+  priority: WARNING
+  tags: [vichan, container, filesystem, mitre_credential_access]
+
+- rule: Outbound connection to a miner/known-bad port from vichan container
+  desc: >
+    A vichan container initiated an outbound connection on a port commonly associated with
+    crypto-mining pools or reverse shells. Legitimate services here talk to db/redis/clamav on
+    the internal network and to NNTP/HTTP(S) upstreams, not these.
+  condition: >
+    evt.type = connect and evt.dir = < and fd.l4proto = tcp
+    and container.id != host
+    and container.name startswith "vichan_"
+    and fd.sport != 0
+    and fd.rport in (3333, 4444, 5555, 6666, 7777, 14444, 45560)
+  output: >
+    Suspicious outbound connection from vichan container
+    (container=%container.name proc=%proc.name connection=%fd.name rport=%fd.rport cmdline=%proc.cmdline)
+  priority: NOTICE
+  tags: [vichan, container, network, mitre_command_and_control]

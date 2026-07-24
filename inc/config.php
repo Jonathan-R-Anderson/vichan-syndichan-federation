@@ -303,6 +303,25 @@
 		'threshold' => 8,
 	];
 
+	// ClamAV malware scanning of uploads (see docker/clamav/ and inc/clamav.php). Every
+	// uploaded file is streamed to the clamd daemon (the `clamav` compose service) and
+	// rejected if a signature matches. Toggle with VICHAN_CLAMAV_ENABLED in the env.
+	$config['clamav'] = [
+		'enabled'     => (bool)(getenv('VICHAN_CLAMAV_ENABLED') ?: false),
+		'host'        => getenv('VICHAN_CLAMAV_HOST') ?: 'clamav',
+		'port'        => (int)(getenv('VICHAN_CLAMAV_PORT') ?: 3310),
+		'timeout'     => 30, // seconds to wait for a verdict
+		// When clamd is unreachable or errors: false = accept the upload (fail open, keeps the
+		// board usable if the scanner is down); true = reject it (fail closed, stricter).
+		'fail_closed' => (bool)(getenv('VICHAN_CLAMAV_FAIL_CLOSED') ?: false),
+	];
+	$config['error']['clamav_found'] = 'Upload rejected: malware detected (%s).';
+	$config['error']['clamav_error'] = 'Upload scanning is temporarily unavailable. Please try again shortly.';
+
+	// Falco runtime-security alerts. The falco compose service writes JSON alerts to this file
+	// (mounted read-only into the php container); the mod panel (?/falco) reads and displays them.
+	$config['falco']['log'] = getenv('VICHAN_FALCO_LOG') ?: '/var/falco/events.log';
+
 	$config['captcha'] = [
 		// Can be false, 'recaptcha', 'hcaptcha', 'native' or 'anime'.
 		// - 'native' is the self-hosted distorted-text captcha.
@@ -1438,6 +1457,7 @@
 
 	$config['file_mod_noticeboard'] = 'mod/noticeboard.html';
 	$config['file_mod_captcha'] = 'mod/captcha.html';
+	$config['file_mod_falco'] = 'mod/falco.html';
 	$config['file_mod_boardlinks'] = 'mod/boardlinks.html';
 	$config['file_mod_image_hashes'] = 'mod/image_hashes.html';
 	$config['file_mod_emergency'] = 'mod/emergency.html';
@@ -1892,6 +1912,8 @@
 	$config['pages_max'] = 10;
 	// Manage the "anime" captcha challenge pool (?/captcha)
 	$config['mod']['manage_captcha'] = ADMIN;
+	// View the Falco runtime-security alert feed (?/falco).
+	$config['mod']['view_falco'] = ADMIN;
 	// Manage the navigation boardlinks bar (?/boardlinks)
 	$config['mod']['edit_boardlinks'] = ADMIN;
 	// Manage the perceptual image-hash blacklist (?/image-hashes)

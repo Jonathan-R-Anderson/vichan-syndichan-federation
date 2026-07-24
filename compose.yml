@@ -32,6 +32,8 @@ services:
       - ./docker/php/sse.conf:/usr/local/etc/php-fpm.d/sse.conf
       - ./docker/php/jit.ini:/usr/local/etc/php/conf.d/jit.ini
       - ./docker/php/php.ini:/usr/local/etc/php/php.ini
+      # Falco writes JSON alerts here; the mod panel (?/falco) reads them read-only.
+      - ./local-instances/${INSTANCE:-0}/falco:/var/falco:ro
     environment:
       # Database settings
       VICHAN_MYSQL_HOST: ${VICHAN_MYSQL_HOST}
@@ -45,6 +47,11 @@ services:
       VICHAN_CACHE_HOST: ${VICHAN_CACHE_HOST}
       VICHAN_CACHE_PORT: ${VICHAN_CACHE_PORT}
       VICHAN_CACHE_PASSWORD: ${VICHAN_CACHE_PASSWORD}
+      # ClamAV upload scanning
+      VICHAN_CLAMAV_ENABLED: ${VICHAN_CLAMAV_ENABLED:-0}
+      VICHAN_CLAMAV_HOST: ${VICHAN_CLAMAV_HOST:-clamav}
+      VICHAN_CLAMAV_PORT: ${VICHAN_CLAMAV_PORT:-3310}
+      VICHAN_CLAMAV_FAIL_CLOSED: ${VICHAN_CLAMAV_FAIL_CLOSED:-0}
       # Cookies
       VICHAN_COOKIES_MOD: ${VICHAN_COOKIES_MOD}
       # Flood Control
@@ -68,6 +75,7 @@ services:
       VICHAN_DIRECTORIES_ROOT: ${VICHAN_DIRECTORIES_ROOT}
     depends_on:
       - db
+      - clamav
 
   db:
     image: mysql:lts
@@ -99,6 +107,45 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # Malware scanning of uploads. clamd listens on 3310 (compose network only); post.php streams
+  # each uploaded file to it (inc/clamav.php) and rejects anything a signature matches. The
+  # signature DB is persisted so it is not re-downloaded (~hundreds of MB) on every restart.
+  # NOTE: clamd holds the signatures in RAM (~1-2 GB). Make sure the host has the headroom, or
+  # leave VICHAN_CLAMAV_ENABLED=0 to keep the service off.
+  clamav:
+    image: clamav/clamav:latest
+    container_name: vichan_clamav
+    restart: unless-stopped
+    volumes:
+      - ./local-instances/${INSTANCE:-0}/clamav:/var/lib/clamav
+      - ./docker/clamav/clamd.conf:/etc/clamav/clamd.conf:ro
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # Runtime threat detection. Falco watches syscalls (modern eBPF — no kernel headers needed) and
+  # container activity, writing JSON alerts that the mod panel (?/falco) reads and displays. It
+  # needs deep host access (privileged + /proc + the docker socket); that is inherent to
+  # host-level monitoring, not specific to this setup.
+  falco:
+    image: falcosecurity/falco:latest
+    container_name: vichan_falco
+    restart: unless-stopped
+    privileged: true
+    pid: "host"
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - /etc:/host/etc:ro
+      - ./docker/falco/falco.yaml:/etc/falco/falco.yaml:ro
+      - ./docker/falco/rules.d:/etc/falco/rules.d:ro
+      - ./local-instances/${INSTANCE:-0}/falco:/var/log/falco
+    environment:
+      - HOST_ROOT=/host
 
   # One-shot schema migration. `docker compose up` rebuilds code but never applies
   # install.sql, so tables added to the schema later (e.g. nntp_settings, deleted_thread)

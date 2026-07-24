@@ -1052,6 +1052,24 @@ if (isset($_POST['delete'])) {
 		}
 	}
 
+	// Scan every uploaded file for malware with ClamAV before the post is accepted. Infected
+	// files are always rejected; a scanner error only blocks the post when fail_closed is set.
+	if ($post['has_file'] && !empty($config['clamav']['enabled']) && !$dropped_post) {
+		require_once 'inc/clamav.php';
+		foreach ($post['files'] as $scan_file) {
+			$verdict = clamav_scan_file($config, $scan_file['tmp_name']);
+			if ($verdict['status'] === 'infected') {
+				error_log('vichan: ClamAV blocked upload on /' . $board['uri'] . '/: ' . $verdict['signature']);
+				error(sprintf($config['error']['clamav_found'], htmlspecialchars($verdict['signature'], ENT_QUOTES)));
+			} elseif ($verdict['status'] === 'error') {
+				error_log('vichan: ClamAV scan error: ' . $verdict['signature']);
+				if (!empty($config['clamav']['fail_closed'])) {
+					error($config['error']['clamav_error']);
+				}
+			}
+		}
+	}
+
 	// Reject images that match the perceptual/exact image-hash blacklist.
 	if ($post['has_file'] && !empty($config['image_hash']['enabled'])
 		&& !hasPermission($config['mod']['bypass_filters'], $board['uri']) && !$dropped_post) {

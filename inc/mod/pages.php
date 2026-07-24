@@ -917,6 +917,80 @@ function mod_captcha_delete(Context $ctx, $id) {
 	header('Location: ?/captcha', true, $config['redirect_http']);
 }
 
+// Read the last $lines lines of a (possibly large) file without loading the whole thing.
+function falco_tail($file, $lines) {
+	$f = @fopen($file, 'rb');
+	if (!$f) {
+		return array();
+	}
+	$buffer = '';
+	fseek($f, 0, SEEK_END);
+	$read_pos = ftell($f);
+	$newlines = 0;
+	while ($read_pos > 0 && $newlines <= $lines) {
+		$chunk = ($read_pos >= 4096) ? 4096 : $read_pos;
+		$read_pos -= $chunk;
+		fseek($f, $read_pos);
+		$buffer = fread($f, $chunk) . $buffer;
+		$newlines = substr_count($buffer, "\n");
+	}
+	fclose($f);
+	return array_slice(explode("\n", $buffer), -$lines);
+}
+
+function mod_falco(Context $ctx) {
+	global $mod;
+	$config = $ctx->get('config');
+
+	if (!hasPermission($config['mod']['view_falco']))
+		error($config['error']['noaccess']);
+
+	$logfile = isset($config['falco']['log']) ? $config['falco']['log'] : '/var/falco/events.log';
+	$available = @is_readable($logfile);
+	$max = 300;
+	$events = array();
+
+	if ($available) {
+		foreach (falco_tail($logfile, $max) as $line) {
+			$line = trim($line);
+			if ($line === '')
+				continue;
+			$e = json_decode($line, true);
+			if (!is_array($e) || !isset($e['rule']))
+				continue;
+			$events[] = array(
+				'time'     => isset($e['time']) ? (string)$e['time'] : '',
+				'priority' => isset($e['priority']) ? (string)$e['priority'] : '',
+				'rule'     => (string)$e['rule'],
+				'output'   => isset($e['output']) ? (string)$e['output'] : '',
+			);
+		}
+		$events = array_reverse($events); // newest first
+	}
+
+	// Tally by priority for the summary line.
+	$counts = array();
+	foreach ($events as $e) {
+		$p = strtolower($e['priority']);
+		if ($p === '') $p = 'unknown';
+		$counts[$p] = isset($counts[$p]) ? $counts[$p] + 1 : 1;
+	}
+
+	mod_page(
+		_('Falco security alerts'),
+		$config['file_mod_falco'],
+		array(
+			'events'    => $events,
+			'counts'    => $counts,
+			'available' => $available,
+			'logfile'   => $logfile,
+			'shown'     => count($events),
+			'max'       => $max,
+		),
+		$mod
+	);
+}
+
 function mod_boardlinks(Context $ctx) {
 	global $mod;
 	$config = $ctx->get('config');

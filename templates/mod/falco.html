@@ -1,0 +1,53 @@
+<style>
+/* Inlined so it renders regardless of stylesheet caching. */
+.falco-summary { margin: 6px 0 12px; }
+.falco-pill { display: inline-block; padding: 1px 8px; margin-right: 6px; border-radius: 10px; color: #fff; font: bold 12px/18px sans-serif; }
+.falco-p-emergency, .falco-p-alert, .falco-p-critical, .falco-p-error { background: #b32020; }
+.falco-p-warning { background: #c76a1a; }
+.falco-p-notice { background: #1a6fd0; }
+.falco-p-informational, .falco-p-info, .falco-p-debug, .falco-p-unknown { background: #777; }
+table.falco-events { width: 100%; border-collapse: collapse; margin-top: 6px; }
+table.falco-events th, table.falco-events td { border: 1px solid #bbb; padding: 4px 6px; text-align: left; vertical-align: top; font-size: 13px; }
+table.falco-events td.falco-out { font-family: monospace; word-break: break-word; }
+.falco-time { white-space: nowrap; font-size: 12px; color: #555; }
+.falco-empty { text-align: center; color: #888; font-style: italic; margin: 24px 0; }
+</style>
+
+<p class="unimportant" style="text-align:center;word-wrap:break-word">
+	{% trans 'Runtime security alerts from Falco — host and container syscall monitoring. Newest first.' %}
+</p>
+
+{% if not available %}
+	<div class="falco-empty">
+		{% trans 'No Falco alert log is readable yet.' %}<br>
+		<span class="unimportant">
+			{% trans 'Normal if the falco service has not started, has produced no alerts, or the log path is wrong. Expected at' %}
+			<code>{{ logfile|e }}</code>.
+		</span>
+	</div>
+{% elseif events is empty %}
+	<div class="falco-empty">{% trans 'No alerts recorded yet — the system looks quiet.' %}</div>
+{% else %}
+	<div class="falco-summary">
+		{% trans 'Showing the most recent' %} <strong>{{ shown }}</strong> {% trans 'alerts' %}.&nbsp;
+		{% for prio, n in counts %}
+			<span class="falco-pill falco-p-{{ prio|e }}">{{ prio|e }}: {{ n }}</span>
+		{% endfor %}
+	</div>
+	<table class="falco-events">
+		<tr>
+			<th>{% trans 'Time' %}</th>
+			<th>{% trans 'Priority' %}</th>
+			<th>{% trans 'Rule' %}</th>
+			<th>{% trans 'Detail' %}</th>
+		</tr>
+		{% for e in events %}
+			<tr>
+				<td class="falco-time">{{ e.time|e }}</td>
+				<td><span class="falco-pill falco-p-{{ e.priority|lower|e }}">{{ e.priority|e }}</span></td>
+				<td>{{ e.rule|e }}</td>
+				<td class="falco-out">{{ e.output|e }}</td>
+			</tr>
+		{% endfor %}
+	</table>
+{% endif %}
