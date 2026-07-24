@@ -1145,6 +1145,14 @@
 	// Additional Javascript files to include on board index and thread pages. See js/ for available scripts.
 	$config['additional_javascript'][] = 'js/jquery.min.js';
 	$config['additional_javascript'][] = 'js/inline-expanding.js';
+	// Real-time updates (poll-based, no extra services): new replies appear in an open thread
+	// and new threads/reply-counts appear on the index without a manual refresh. auto-reload
+	// re-fetches the thread and injects new posts; live-index polls the board's 0.json (the
+	// 4chan-compatible API is enabled below). titlebar-notifications shows the unread count in
+	// the browser tab and must load before auto-reload so the latter can hook into it.
+	$config['additional_javascript'][] = 'js/titlebar-notifications.js';
+	$config['additional_javascript'][] = 'js/auto-reload.js';
+	$config['additional_javascript'][] = 'js/live-index.js';
 	// $config['additional_javascript'][] = 'js/local-time.js';
 
 	// Some scripts require jQuery. Check the comments in script files to see what's needed. When enabling
