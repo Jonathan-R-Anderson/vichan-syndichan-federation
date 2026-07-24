@@ -28,7 +28,10 @@ if (!preg_match('/^[A-Za-z0-9._-]{1,58}$/', $board)) {
 
 // --- prepare the stream ----------------------------------------------------------------
 @set_time_limit(0);
-ignore_user_abort(false);              // let PHP tear the worker down when the client goes away
+// Keep running when the client goes away; we detect the disconnect ourselves via
+// connection_aborted() after each write (checking it as a loop *condition* before the first
+// write reads true under php-fpm and kills the stream instantly).
+ignore_user_abort(true);
 while (ob_get_level() > 0) { @ob_end_flush(); }
 
 $emit = function ($line) {
@@ -77,7 +80,7 @@ if ($last_ver === false) { $last_ver = '0'; } // key not created until this boar
 $started = time();
 $max_lifetime = 3600;   // recycle the worker at most hourly (the client transparently reconnects)
 
-while (!connection_aborted() && (time() - $started) < $max_lifetime) {
+while ((time() - $started) < $max_lifetime) {
 	try {
 		$ver = $redis->get($ver_key);
 		if ($ver === false) { $ver = '0'; }        // absent key = no posts yet, not an error
@@ -98,6 +101,8 @@ while (!connection_aborted() && (time() - $started) < $max_lifetime) {
 		$redis = $connect();
 		if ($redis === null) { break; }
 	}
+	// A failed write above flips this to true (the client is gone); stop and free the worker.
+	if (connection_aborted()) { break; }
 	sleep(1);
 }
 
