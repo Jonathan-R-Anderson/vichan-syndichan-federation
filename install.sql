@@ -455,6 +455,45 @@ CREATE TABLE IF NOT EXISTS `anime_captcha` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `captcha_categories`
+--
+-- A grid-captcha category and the prompt shown above its 4x4 grid (e.g.
+-- name="cats", prompt="Select all cats"). Imported from a leomotors category
+-- title, or added from the mod panel (?/captcha).
+--
+
+CREATE TABLE IF NOT EXISTS `captcha_categories` (
+  `name` VARCHAR(64) NOT NULL,
+  `prompt` VARCHAR(255) NOT NULL DEFAULT '',
+  `created_at` INT(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `captcha_grid_images`
+--
+-- The image pool for the reCAPTCHA-style grid captcha. Each image belongs to a
+-- category and is flagged is_target=1 when it matches that category's prompt
+-- (i.e. the user should select it). A challenge draws a mix of target and
+-- non-target images into a 4x4 grid; the correct selection is kept server-side.
+--
+
+CREATE TABLE IF NOT EXISTS `captcha_grid_images` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `category` VARCHAR(64) NOT NULL,
+  `image_url` TEXT NOT NULL,
+  `is_target` TINYINT(1) NOT NULL DEFAULT 0,
+  `label` VARCHAR(255) NOT NULL DEFAULT '',
+  `created_at` INT(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `cat_target` (`category`, `is_target`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `boardlinks`
 --
 -- Admin-managed entries for the navigation "boardlinks" bar (see createBoardlist()).

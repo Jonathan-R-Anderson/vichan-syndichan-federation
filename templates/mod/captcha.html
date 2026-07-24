@@ -1,58 +1,124 @@
+<p class="unimportant" style="text-align:center;word-wrap:break-word">
+	{% trans 'The "anime" captcha is a reCAPTCHA-style grid: the user selects the tiles matching a category prompt. Build a category, give it a prompt, then add images flagged as matching (target) or not. A challenge mixes both; the correct selection is checked server-side.' %}
+</p>
+
 <fieldset>
-	<legend>{% trans 'Add captcha challenge' %}</legend>
+	<legend>{% trans 'Import a challenge set' %}</legend>
 	<form style="margin:0" action="?/captcha" method="post">
 		<input type="hidden" name="token" value="{{ token }}">
-		<table>
-			<tr>
-				<th><label for="image_url">{% trans 'Image URL' %}</label></th>
-				<td><input type="text" size="55" name="image_url" id="image_url" placeholder="https://example.com/character.png"></td>
-			</tr>
-			<tr>
-				<th><label for="answer">{% trans 'Answer' %}</label></th>
-				<td><input type="text" size="55" name="answer" id="answer" placeholder="{% trans 'Character name' %}"></td>
-			</tr>
-			<tr>
-				<th><label for="question">{% trans 'Question' %}</label></th>
-				<td><input type="text" size="55" name="question" id="question" placeholder="{% trans 'Which anime character is this? (optional)' %}"></td>
-			</tr>
-			<tr>
-				<th><label for="category">{% trans 'Category' %}</label></th>
-				<td><input type="text" size="55" name="category" id="category" placeholder="{% trans 'optional' %}"></td>
-			</tr>
-		</table>
-		<p style="text-align:center">
-			<input type="submit" value="{% trans 'Add challenge' %}">
+		<input type="hidden" name="action" value="import">
+		<p style="margin:0 0 6px">
+			{% trans 'Fetch a CaptchaGetAll payload from a URL' %}:<br>
+			<input type="text" size="60" name="import_url" placeholder="https://anime-captcha.vercel.app/api/getall">
+		</p>
+		<p style="margin:0 0 6px">
+			{% trans 'or paste the JSON' %}:<br>
+			<textarea name="import_json" rows="4" style="width:100%" placeholder='{"cats":{"title":"Select all cats","questions":[{"image":"https://.../c.png","answer":true}, ...]}}'></textarea>
+		</p>
+		<p style="text-align:center;margin:4px 0"><input type="submit" value="{% trans 'Import' %}"></p>
+		<p class="unimportant" style="word-wrap:break-word">
+			{% trans 'Categories and images are added (existing category prompts are updated). Imported images keep their remote URL until you mirror them below.' %}
 		</p>
 	</form>
 </fieldset>
 
-<p class="unimportant" style="text-align:center;word-wrap:break-word">
-	{% trans 'Answer options are drawn from the answers across the whole pool, so add several challenges for the choices to be meaningful.' %}
-</p>
+{% if external_remaining > 0 %}
+	<fieldset>
+		<legend>{% trans 'Mirror remote images' %}</legend>
+		<p class="unimportant" style="word-wrap:break-word">
+			{% trans 'Remote (hot-linked) images left to mirror locally' %}: <strong>{{ external_remaining }}</strong>.
+			{% trans 'Mirroring copies each image onto this server (deduplicated) so it will not rot or be hot-link-blocked. Run repeatedly until zero.' %}
+		</p>
+		<form style="margin:0" action="?/captcha" method="post">
+			<input type="hidden" name="token" value="{{ token }}">
+			<input type="hidden" name="action" value="mirror_batch">
+			<p style="text-align:center;margin:0"><input type="submit" value="{% trans 'Mirror next 25' %}"></p>
+		</form>
+	</fieldset>
+{% endif %}
+
+<fieldset>
+	<legend>{% trans 'Categories' %}</legend>
+	<table class="mod" style="width:100%">
+		<tr><th>{% trans 'Name' %}</th><th>{% trans 'Prompt' %}</th><th>{% trans 'Images' %}</th><th>{% trans 'Matching' %}</th><th></th></tr>
+		{% for c in categories %}
+			<tr>
+				<td><code>{{ c.name|e }}</code></td>
+				<td>{{ c.prompt|e }}</td>
+				<td>{{ c.total }}</td>
+				<td>{{ c.targets }}</td>
+				<td>
+					<form action="?/captcha" method="post" style="margin:0" onsubmit="return confirm('{% trans 'Delete this category and all its images?' %}');">
+						<input type="hidden" name="token" value="{{ token }}">
+						<input type="hidden" name="action" value="delete_category">
+						<input type="hidden" name="name" value="{{ c.name|e }}">
+						<input type="submit" value="{% trans 'Delete' %}">
+					</form>
+				</td>
+			</tr>
+		{% else %}
+			<tr><td colspan="5" style="text-align:center">{% trans 'No categories yet — import a set or add one below.' %}</td></tr>
+		{% endfor %}
+	</table>
+	<form action="?/captcha" method="post" style="margin-top:8px">
+		<input type="hidden" name="token" value="{{ token }}">
+		<input type="hidden" name="action" value="add_category">
+		<input type="text" name="name" placeholder="{% trans 'name (a-z0-9_.-)' %}" size="16">
+		<input type="text" name="prompt" placeholder="{% trans 'prompt, e.g. Select all cats' %}" size="34">
+		<input type="submit" value="{% trans 'Add / update category' %}">
+	</form>
+</fieldset>
+
+<fieldset>
+	<legend>{% trans 'Add an image' %}</legend>
+	<form style="margin:0" action="?/captcha" method="post">
+		<input type="hidden" name="token" value="{{ token }}">
+		<input type="hidden" name="action" value="add_image">
+		<table>
+			<tr>
+				<th><label for="ci_category">{% trans 'Category' %}</label></th>
+				<td><input type="text" list="ci_cats" name="category" id="ci_category" size="24" placeholder="{% trans 'category name' %}">
+					<datalist id="ci_cats">{% for c in categories %}<option value="{{ c.name|e }}">{% endfor %}</datalist></td>
+			</tr>
+			<tr>
+				<th><label for="ci_url">{% trans 'Image URL' %}</label></th>
+				<td><input type="text" size="55" name="image_url" id="ci_url" placeholder="https://example.com/pic.png"></td>
+			</tr>
+			<tr>
+				<th><label for="ci_label">{% trans 'Label' %}</label></th>
+				<td><input type="text" size="55" name="label" id="ci_label" placeholder="{% trans 'optional note (shown only in this panel)' %}"></td>
+			</tr>
+			<tr>
+				<th>{% trans 'Matches prompt?' %}</th>
+				<td>
+					<label><input type="checkbox" name="is_target" value="1"> {% trans 'this image is a target (user should select it)' %}</label><br>
+					<label><input type="checkbox" name="mirror" value="1" checked> {% trans 'mirror the image onto this server' %}</label>
+				</td>
+			</tr>
+		</table>
+		<p style="text-align:center;margin:4px 0"><input type="submit" value="{% trans 'Add image' %}"></p>
+	</form>
+</fieldset>
 
 <table class="mod" style="width:100%">
 	<tr>
 		<th>{% trans 'Image' %}</th>
-		<th>{% trans 'Answer' %}</th>
-		<th>{% trans 'Question' %}</th>
 		<th>{% trans 'Category' %}</th>
+		<th>{% trans 'Target' %}</th>
+		<th>{% trans 'Label' %}</th>
 		<th>{% trans 'Added' %}</th>
 		<th></th>
 	</tr>
-	{% for challenge in challenges %}
+	{% for image in images %}
 		<tr>
-			<td><img src="{{ challenge.image_url|e }}" alt="" style="max-width:80px;max-height:80px"></td>
-			<td>{{ challenge.answer|e }}</td>
-			<td>{{ challenge.question|e }}</td>
-			<td>{{ challenge.category|e }}</td>
-			<td>{{ challenge.created_at|date(config.post_date) }}</td>
-			<td>
-				<a class="unimportant" href="?/captcha/delete/{{ challenge.id }}/{{ challenge.delete_token }}">[{% trans 'delete' %}]</a>
-			</td>
+			<td><img src="{{ image.image_url|e }}" alt="" style="max-width:64px;max-height:64px" loading="lazy"></td>
+			<td><code>{{ image.category|e }}</code></td>
+			<td>{% if image.is_target %}<strong>{% trans 'yes' %}</strong>{% else %}<span class="unimportant">{% trans 'no' %}</span>{% endif %}</td>
+			<td class="unimportant" style="word-wrap:break-word;max-width:280px">{{ image.label|e }}</td>
+			<td>{{ image.created_at|date(config.post_date) }}</td>
+			<td><a class="unimportant" href="?/captcha/delete/{{ image.id }}/{{ image.delete_token }}">[{% trans 'delete' %}]</a></td>
 		</tr>
 	{% else %}
-		<tr>
-			<td colspan="6" style="text-align:center">{% trans 'No challenges yet.' %}</td>
-		</tr>
+		<tr><td colspan="6" style="text-align:center">{% trans 'No images yet.' %}</td></tr>
 	{% endfor %}
 </table>

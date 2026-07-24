@@ -1286,3 +1286,37 @@ div.mix {
 .nntp-source .nntp-source-label {
   font-style: italic;
 }
+
+/* "anime" grid captcha (reCAPTCHA-style select-all-matching tiles) */
+.grid-captcha { max-width: 320px; }
+.grid-captcha-prompt { font-weight: bold; margin: 0 0 6px; }
+.grid-captcha-grid { display: grid; gap: 3px; }
+.grid-captcha-tile {
+  position: relative;
+  cursor: pointer;
+  border: 3px solid transparent;
+  box-sizing: border-box;
+  line-height: 0;
+}
+.grid-captcha-tile img {
+  width: 100%;
+  height: 72px;
+  object-fit: cover;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.grid-captcha-tile.selected { border-color: #4a90d9; }
+.grid-captcha-tile.selected::after {
+  content: "\2713";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  background: #4a90d9;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+.grid-captcha-error { color: #a00; font-size: 12px; }

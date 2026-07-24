@@ -647,6 +647,49 @@ function mod_noticeboard_delete(Context $ctx, $id) {
 	header('Location: ?/noticeboard', true, $config['redirect_http']);
 }
 
+/** Reject URLs that resolve to private/loopback/reserved addresses (SSRF guard). */
+function captcha_url_is_safe($url) {
+	$host = parse_url($url, PHP_URL_HOST);
+	if (!$host)
+		return false;
+	$ip = filter_var($host, FILTER_VALIDATE_IP) ? $host : @gethostbyname($host);
+	if (!filter_var($ip, FILTER_VALIDATE_IP))
+		return false;
+	return (bool)filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+}
+
+/**
+ * Best-effort mirror of an external captcha image to a local, deduplicated file under
+ * $dir. Returns the web path (e.g. /static/captcha/<sha256>.png) or false. Server-side
+ * fetch; validates the bytes are a real image (png/jpeg/gif/webp) and caps the size.
+ */
+function captcha_mirror_image($url, $dir) {
+	if (!preg_match('#^https?://#i', $url) || !captcha_url_is_safe($url))
+		return false;
+	$http = stream_context_create(['http' => [
+		'timeout' => 8,
+		'follow_location' => 1,
+		'max_redirects' => 3,
+		'header' => "User-Agent: Mozilla/5.0 (vichan captcha importer)\r\n",
+	]]);
+	$data = @file_get_contents($url, false, $http, 0, 5 * 1024 * 1024 + 1);
+	if ($data === false || strlen($data) === 0 || strlen($data) > 5 * 1024 * 1024)
+		return false;
+	$info = @getimagesizefromstring($data);
+	$map = [IMAGETYPE_PNG => 'png', IMAGETYPE_JPEG => 'jpg', IMAGETYPE_GIF => 'gif', IMAGETYPE_WEBP => 'webp'];
+	if ($info === false || !isset($map[$info[2]]))
+		return false;
+	if (!is_dir($dir))
+		@mkdir($dir, 0755, true);
+	$rel = $dir . '/' . hash('sha256', $data) . '.' . $map[$info[2]];
+	if (!is_file($rel)) {
+		if (@file_put_contents($rel, $data) === false)
+			return false;
+		@chmod($rel, 0644);
+	}
+	return '/' . $rel;
+}
+
 function mod_captcha(Context $ctx) {
 	global $mod;
 	$config = $ctx->get('config');
@@ -654,45 +697,168 @@ function mod_captcha(Context $ctx) {
 	if (!hasPermission($config['mod']['manage_captcha']))
 		error($config['error']['noaccess']);
 
-	if (isset($_POST['image_url'], $_POST['answer'])) {
-		$image_url = trim($_POST['image_url']);
-		$answer = trim($_POST['answer']);
-		$question = isset($_POST['question']) ? trim($_POST['question']) : '';
-		$category = isset($_POST['category']) ? trim($_POST['category']) : '';
+	$grid_image_dir = 'static/captcha'; // mirror target (matches inc/captcha/config.php)
 
-		if ($image_url === '' || $answer === '')
-			error(_('Both an image URL and an answer are required.'));
+	if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+		$action = isset($_POST['action']) ? $_POST['action'] : '';
 
-		// The `anime_captcha` table has no board prefix (single backticks), matching
-		// inc/captcha/anime.php.
-		$query = prepare('INSERT INTO `anime_captcha` (`category`, `image_url`, `question`, `answer`, `created_at`) VALUES (:category, :image_url, :question, :answer, :created_at)');
-		$query->bindValue(':category', $category);
-		$query->bindValue(':image_url', $image_url);
-		$query->bindValue(':question', $question);
-		$query->bindValue(':answer', $answer);
-		$query->bindValue(':created_at', time());
-		$query->execute() or error(db_error($query));
+		switch ($action) {
+			case 'add_category':
+				$name = strtolower(preg_replace('/[^a-z0-9_.-]/i', '', trim($_POST['name'] ?? '')));
+				$prompt = trim($_POST['prompt'] ?? '');
+				if ($name === '')
+					error(_('A category name (letters, digits, . _ -) is required.'));
+				$q = prepare('INSERT INTO `captcha_categories` (`name`, `prompt`, `created_at`) VALUES (:n, :p, :t) ON DUPLICATE KEY UPDATE `prompt` = :p2');
+				$q->bindValue(':n', $name);
+				$q->bindValue(':p', $prompt);
+				$q->bindValue(':p2', $prompt);
+				$q->bindValue(':t', time());
+				$q->execute() or error(db_error($q));
+				modLog('Saved captcha category ' . $name);
+				break;
 
-		modLog('Added an anime captcha challenge');
+			case 'delete_category':
+				$name = trim($_POST['name'] ?? '');
+				$d = prepare('DELETE FROM `captcha_categories` WHERE `name` = :n');
+				$d->bindValue(':n', $name);
+				$d->execute() or error(db_error($d));
+				$d = prepare('DELETE FROM `captcha_grid_images` WHERE `category` = :n');
+				$d->bindValue(':n', $name);
+				$d->execute() or error(db_error($d));
+				modLog('Deleted captcha category ' . $name);
+				break;
+
+			case 'add_image':
+				$category = trim($_POST['category'] ?? '');
+				$image_url = trim($_POST['image_url'] ?? '');
+				$is_target = isset($_POST['is_target']) ? 1 : 0;
+				$label = trim($_POST['label'] ?? '');
+				if ($category === '' || $image_url === '')
+					error(_('A category and an image URL are required.'));
+				if (!preg_match('#^(https?://|/)#i', $image_url))
+					error(_('The image URL must start with http(s):// or a leading /.'));
+				if (isset($_POST['mirror']) && preg_match('#^https?://#i', $image_url)) {
+					$local = captcha_mirror_image($image_url, $grid_image_dir);
+					if ($local !== false) $image_url = $local;
+				}
+				$q = prepare('INSERT INTO `captcha_grid_images` (`category`, `image_url`, `is_target`, `label`, `created_at`) VALUES (:c, :u, :t, :l, :ts)');
+				$q->bindValue(':c', $category);
+				$q->bindValue(':u', $image_url);
+				$q->bindValue(':t', $is_target, PDO::PARAM_INT);
+				$q->bindValue(':l', mb_substr($label, 0, 255));
+				$q->bindValue(':ts', time());
+				$q->execute() or error(db_error($q));
+				modLog('Added a captcha image to ' . $category);
+				break;
+
+			case 'delete_image':
+				$q = prepare('DELETE FROM `captcha_grid_images` WHERE `id` = :id');
+				$q->bindValue(':id', (int)($_POST['id'] ?? 0), PDO::PARAM_INT);
+				$q->execute() or error(db_error($q));
+				break;
+
+			case 'import':
+				// Accept a pasted CaptchaGetAll/CaptchaType JSON, or a URL to fetch it from
+				// (e.g. https://anime-captcha.vercel.app/api/getall). getall conveniently
+				// includes the answer key, which we then keep server-side.
+				$json = trim($_POST['import_json'] ?? '');
+				$url = trim($_POST['import_url'] ?? '');
+				if ($json === '' && $url !== '' && preg_match('#^https?://#i', $url) && captcha_url_is_safe($url)) {
+					$hc = stream_context_create(['http' => ['timeout' => 15, 'header' => "User-Agent: Mozilla/5.0\r\n"]]);
+					$json = @file_get_contents($url, false, $hc, 0, 8 * 1024 * 1024);
+				}
+				$data = json_decode((string)$json, true);
+				if (!is_array($data))
+					error(_('Could not parse the import JSON (paste a CaptchaGetAll object or an /api/getall URL).'));
+				// Normalise a single CaptchaType into a { category => type } map.
+				if (isset($data['questions']) && is_array($data['questions'])) {
+					$data = [(isset($data['category']) ? $data['category'] : 'imported') => $data];
+				}
+				$cats = 0; $imgs = 0;
+				foreach ($data as $cname => $ctype) {
+					if (!is_array($ctype) || empty($ctype['questions']) || !is_array($ctype['questions']))
+						continue;
+					$cname = strtolower(preg_replace('/[^a-z0-9_.-]/i', '', (string)$cname));
+					if ($cname === '') continue;
+					$prompt = isset($ctype['title'])
+						? trim(strip_tags(str_replace(['<br>', '<br/>', '<br />'], ' ', (string)$ctype['title'])))
+						: '';
+					$cq = prepare('INSERT INTO `captcha_categories` (`name`, `prompt`, `created_at`) VALUES (:n, :p, :t) ON DUPLICATE KEY UPDATE `prompt` = :p2');
+					$cq->bindValue(':n', $cname);
+					$cq->bindValue(':p', mb_substr($prompt, 0, 255));
+					$cq->bindValue(':p2', mb_substr($prompt, 0, 255));
+					$cq->bindValue(':t', time());
+					$cq->execute() or error(db_error($cq));
+					$cats++;
+					foreach ($ctype['questions'] as $qd) {
+						if (!is_array($qd) || empty($qd['image'])) continue;
+						$img = trim((string)$qd['image']);
+						if (!preg_match('#^https?://#i', $img)) continue;
+						$label = isset($qd['name']['en']) ? (string)$qd['name']['en'] : '';
+						if (isset($qd['anime']['en'])) $label = trim($label . ' — ' . (string)$qd['anime']['en'], ' —');
+						$iq = prepare('INSERT INTO `captcha_grid_images` (`category`, `image_url`, `is_target`, `label`, `created_at`) VALUES (:c, :u, :t, :l, :ts)');
+						$iq->bindValue(':c', $cname);
+						$iq->bindValue(':u', $img);
+						$iq->bindValue(':t', !empty($qd['answer']) ? 1 : 0, PDO::PARAM_INT);
+						$iq->bindValue(':l', mb_substr($label, 0, 255));
+						$iq->bindValue(':ts', time());
+						$iq->execute() or error(db_error($iq));
+						$imgs++;
+					}
+				}
+				modLog("Imported $cats captcha category(ies), $imgs image(s)");
+				break;
+
+			case 'mirror_batch':
+				// Mirror external images to local files in bounded batches (avoids request
+				// timeouts on a large import). Re-run until none remain.
+				$sel = query("SELECT `id`, `image_url` FROM `captcha_grid_images` WHERE `image_url` LIKE 'http%' LIMIT 25");
+				$done = 0;
+				if ($sel) foreach ($sel->fetchAll(PDO::FETCH_ASSOC) as $row) {
+					$local = captcha_mirror_image($row['image_url'], $grid_image_dir);
+					if ($local !== false) {
+						$up = prepare('UPDATE `captcha_grid_images` SET `image_url` = :u WHERE `id` = :id');
+						$up->bindValue(':u', $local);
+						$up->bindValue(':id', (int)$row['id'], PDO::PARAM_INT);
+						$up->execute();
+						$done++;
+					}
+				}
+				modLog("Mirrored $done captcha image(s)");
+				break;
+
+			default:
+				error($config['error']['noaccess']);
+		}
 
 		header('Location: ?/captcha', true, $config['redirect_http']);
 		return;
 	}
 
-	$query = query('SELECT * FROM `anime_captcha` ORDER BY `id` DESC') or error(db_error());
-	$challenges = $query->fetchAll(PDO::FETCH_ASSOC);
+	$categories = query('SELECT c.`name`, c.`prompt`,
+		(SELECT COUNT(*) FROM `captcha_grid_images` g WHERE g.`category` = c.`name`) AS `total`,
+		(SELECT COUNT(*) FROM `captcha_grid_images` g WHERE g.`category` = c.`name` AND g.`is_target` = 1) AS `targets`
+		FROM `captcha_categories` c ORDER BY c.`name`') or error(db_error());
+	$categories = $categories->fetchAll(PDO::FETCH_ASSOC);
 
-	foreach ($challenges as &$challenge) {
-		$challenge['delete_token'] = make_secure_link_token('captcha/delete/' . $challenge['id']);
+	$images = query('SELECT * FROM `captcha_grid_images` ORDER BY `id` DESC LIMIT 200') or error(db_error());
+	$images = $images->fetchAll(PDO::FETCH_ASSOC);
+	foreach ($images as &$im) {
+		$im['delete_token'] = make_secure_link_token('captcha/delete/' . $im['id']);
 	}
-	unset($challenge);
+	unset($im);
+
+	$ext = query("SELECT COUNT(*) FROM `captcha_grid_images` WHERE `image_url` LIKE 'http%'");
+	$external_remaining = $ext ? (int)$ext->fetchColumn() : 0;
 
 	mod_page(
-		_('Anime captcha'),
+		_('Captcha challenges'),
 		$config['file_mod_captcha'],
 		[
-			'challenges' => $challenges,
-			'token' => make_secure_link_token('captcha')
+			'categories' => $categories,
+			'images' => $images,
+			'external_remaining' => $external_remaining,
+			'token' => make_secure_link_token('captcha'),
 		],
 		$mod
 	);
@@ -704,11 +870,11 @@ function mod_captcha_delete(Context $ctx, $id) {
 	if (!hasPermission($config['mod']['manage_captcha']))
 		error($config['error']['noaccess']);
 
-	$query = prepare('DELETE FROM `anime_captcha` WHERE `id` = :id');
+	$query = prepare('DELETE FROM `captcha_grid_images` WHERE `id` = :id');
 	$query->bindValue(':id', $id);
 	$query->execute() or error(db_error($query));
 
-	modLog('Deleted an anime captcha challenge');
+	modLog('Deleted a captcha image');
 
 	header('Location: ?/captcha', true, $config['redirect_http']);
 }
