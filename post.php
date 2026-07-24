@@ -1449,6 +1449,17 @@ if (isset($_POST['delete'])) {
 
 	buildIndex();
 
+	// Real-time: now that the thread and index HTML have been rebuilt, bump this board's change
+	// counter so anyone watching (js/live-push.js via sse.php) sees the post appear without a
+	// refresh. Best-effort — a realtime error never blocks or breaks posting.
+	require_once(__DIR__ . '/inc/realtime.php');
+	rt_publish($board['uri'], array(
+		'type'   => $post['op'] ? 'thread' : 'reply',
+		'board'  => $board['uri'],
+		'thread' => $post['op'] ? $id : $post['thread'],
+		'id'     => $id,
+	));
+
 	// We are already done, let's continue our heavy-lifting work in the background (if we run off FastCGI)
 	if (function_exists('fastcgi_finish_request'))
 		@fastcgi_finish_request();

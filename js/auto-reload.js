@@ -240,6 +240,9 @@ $(document).ready(function(){
 
 	$('#update_thread').on('click', function() { poll(manualUpdate = true); return false; });
 
+	// Real-time (js/live-push.js): a server push triggers an immediate update of this thread.
+	$(document).on('new_post_push', function() { poll(manualUpdate = true); });
+
 	if($("#auto_update_status").is(':checked')) {
 		auto_update(poll_interval_delay);
 	}

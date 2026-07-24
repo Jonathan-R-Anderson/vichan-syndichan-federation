@@ -102,4 +102,10 @@ if (active_page == 'index' && (""+document.location).match(/\/(index\.html)?(\?|
       });
     });
   };
+
+  // Real-time (js/live-push.js): a server push pulls in new threads immediately instead of
+  // waiting for the periodic poll.
+  $(document).on("new_post_push", function() {
+    if (typeof fetch_new_threads === 'function') { fetch_new_threads(); }
+  });
 }();

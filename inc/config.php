@@ -1153,6 +1153,9 @@
 	$config['additional_javascript'][] = 'js/titlebar-notifications.js';
 	$config['additional_javascript'][] = 'js/auto-reload.js';
 	$config['additional_javascript'][] = 'js/live-index.js';
+	// live-push.js upgrades the two pollers above to near-instant via Server-Sent Events
+	// (sse.php + Redis); it degrades gracefully to their timers if the stream is unavailable.
+	$config['additional_javascript'][] = 'js/live-push.js';
 	// $config['additional_javascript'][] = 'js/local-time.js';
 
 	// Some scripts require jQuery. Check the comments in script files to see what's needed. When enabling
