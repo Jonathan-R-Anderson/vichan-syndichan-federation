@@ -1321,23 +1321,73 @@ div.mix {
 }
 .grid-captcha-error { color: #a00; font-size: 12px; }
 
-/* mod panel captcha editor: thumbnails reuse .grid-captcha-* above, so they render at the
-   exact tile size of a live challenge. Each tile gets a delete × overlay. */
-.captcha-admin-lists { display: flex; gap: 20px; flex-wrap: wrap; }
-.captcha-admin-lists > div { flex: 1; min-width: 260px; }
-.captcha-admin-lists .grid-captcha-tile { cursor: default; border-color: #ccc; }
-.captcha-admin-lists .thumb-del {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 1;
-  padding: 0 5px;
-  line-height: 17px;
-  background: rgba(170, 0, 0, 0.85);
+/* mod panel captcha editor: compact, click-to-select thumbnail gallery.
+   Green ✓ = correct answer, red ✗ = decoy; a blue wash marks tiles picked for deletion. */
+.captcha-admin-legend { font-size: 12px; margin: 6px 0 2px; }
+.ans-key {
+  display: inline-block;
+  min-width: 15px;
+  padding: 0 3px;
+  text-align: center;
   color: #fff;
-  font: bold 13px/17px sans-serif;
-  text-decoration: none;
-  border-radius: 0 0 0 3px;
+  font: bold 11px/15px sans-serif;
+  border-radius: 2px;
+  vertical-align: middle;
 }
-.captcha-admin-lists .thumb-del:hover { background: #a00; }
-.captcha-admin-empty { color: #888; font-size: 12px; font-style: italic; margin: 2px 0; }
+.ans-key.correct { background: #2a8a2a; }
+.ans-key.wrong { background: #b32020; }
+.captcha-admin-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 64px);
+  gap: 5px;
+  margin: 4px 0 6px;
+}
+.captcha-admin-tile {
+  position: relative;
+  width: 64px;
+  height: 60px;
+  box-sizing: border-box;
+  border: 2px solid #ccc;
+  cursor: pointer;
+  display: block;
+  line-height: 0;
+}
+.captcha-admin-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.captcha-admin-tile input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+.captcha-admin-tile.correct { border-color: #2a8a2a; }
+.captcha-admin-tile.wrong { border-color: #b32020; }
+.captcha-admin-tile .ans {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 2;
+  min-width: 14px;
+  padding: 0 2px;
+  text-align: center;
+  color: #fff;
+  font: bold 12px/14px sans-serif;
+}
+.captcha-admin-tile.correct .ans { background: #2a8a2a; }
+.captcha-admin-tile.wrong .ans { background: #b32020; }
+.captcha-admin-tile.selected { outline: 3px solid #1a6fd0; outline-offset: -1px; }
+.captcha-admin-tile.selected::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(26, 111, 208, 0.45);
+}
+.captcha-admin-hint { margin-left: 8px; font-size: 11px; }
+.captcha-admin-adds { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; }
+.captcha-admin-add { flex: 1; min-width: 240px; }
+.captcha-admin-add > label { font-size: 12px; display: block; margin-bottom: 2px; }
+.captcha-admin-add textarea { width: 100%; box-sizing: border-box; }
+.captcha-admin-mirror { font-size: 11px; }
+.captcha-admin-empty { color: #888; font-size: 12px; font-style: italic; margin: 4px 0; }

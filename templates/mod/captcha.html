@@ -1,5 +1,5 @@
 <p class="unimportant" style="text-align:center;word-wrap:break-word">
-	{% trans 'The "anime" captcha is a grid: the user is shown a mix of images and must pick the ones matching a prompt. A "set" is one such challenge — a prompt, the matching images, and decoy images. Thumbnails are shown at the exact size they appear in the challenge; click × to remove one, or add more by URL.' %}
+	{% trans 'The "anime" captcha shows a grid of images and asks the poster to pick the ones matching a prompt. Each set below is one such challenge. A <span class="ans-key correct">&#10003;</span> marks a correct answer (the poster should select it); a <span class="ans-key wrong">&#10007;</span> marks a decoy. Click images to select them, then remove them with "Delete selected".' %}
 </p>
 
 {% for c in categories %}
@@ -16,60 +16,53 @@
 			<button type="submit">{% trans 'Save prompt' %}</button>
 		</form>
 
-		<div class="captcha-admin-lists">
-			<div>
-				<label><strong>{% trans 'Matching images' %}</strong> &mdash; {% trans 'users SHOULD select these' %} ({{ c.matching_count }})</label>
-				{% if c.matching %}
-					<div class="grid-captcha">
-						<div class="grid-captcha-grid" style="grid-template-columns:repeat(4,1fr)">
-							{% for img in c.matching %}
-								<div class="grid-captcha-tile">
-									<img src="{{ img.image_url|e }}" alt="" loading="lazy">
-									<a class="thumb-del" href="?/captcha/delete/{{ img.id }}/{{ img.delete_token }}" title="{% trans 'Remove this image' %}" onclick="return confirm('{% trans 'Remove this image?' %}');">&times;</a>
-								</div>
-							{% endfor %}
-						</div>
-					</div>
-				{% else %}
-					<p class="captcha-admin-empty">{% trans 'None yet.' %}</p>
-				{% endif %}
-				<form action="?/captcha" method="post" style="margin:6px 0 0">
-					<input type="hidden" name="token" value="{{ token }}">
-					<input type="hidden" name="action" value="add_images">
-					<input type="hidden" name="category" value="{{ c.name|e }}">
-					<input type="hidden" name="is_target" value="1">
-					<textarea name="urls" rows="3" style="width:100%;box-sizing:border-box" placeholder="{% trans 'Add matching image URLs, one per line' %}"></textarea>
-					<label style="font-size:12px"><input type="checkbox" name="mirror" value="1" checked> {% trans 'copy onto this server' %}</label>
-					<button type="submit">{% trans 'Add matching' %}</button>
-				</form>
-			</div>
+		<p class="captcha-admin-legend">
+			<span class="ans-key correct">&#10003;</span> {% trans 'correct' %} ({{ c.matching_count }})
+			&nbsp;&nbsp;
+			<span class="ans-key wrong">&#10007;</span> {% trans 'decoy' %} ({{ c.decoy_count }})
+		</p>
 
-			<div>
-				<label><strong>{% trans 'Decoy images' %}</strong> &mdash; {% trans 'users should NOT select these' %} ({{ c.decoy_count }})</label>
-				{% if c.decoys %}
-					<div class="grid-captcha">
-						<div class="grid-captcha-grid" style="grid-template-columns:repeat(4,1fr)">
-							{% for img in c.decoys %}
-								<div class="grid-captcha-tile">
-									<img src="{{ img.image_url|e }}" alt="" loading="lazy">
-									<a class="thumb-del" href="?/captcha/delete/{{ img.id }}/{{ img.delete_token }}" title="{% trans 'Remove this image' %}" onclick="return confirm('{% trans 'Remove this image?' %}');">&times;</a>
-								</div>
-							{% endfor %}
-						</div>
-					</div>
-				{% else %}
-					<p class="captcha-admin-empty">{% trans 'None yet.' %}</p>
-				{% endif %}
-				<form action="?/captcha" method="post" style="margin:6px 0 0">
-					<input type="hidden" name="token" value="{{ token }}">
-					<input type="hidden" name="action" value="add_images">
-					<input type="hidden" name="category" value="{{ c.name|e }}">
-					<input type="hidden" name="is_target" value="0">
-					<textarea name="urls" rows="3" style="width:100%;box-sizing:border-box" placeholder="{% trans 'Add decoy image URLs, one per line' %}"></textarea>
-					<label style="font-size:12px"><input type="checkbox" name="mirror" value="1" checked> {% trans 'copy onto this server' %}</label>
-					<button type="submit">{% trans 'Add decoys' %}</button>
-				</form>
-			</div>
+		{% if c.images %}
+			<form action="?/captcha" method="post" class="captcha-admin-delform" onsubmit="return confirm('{% trans 'Delete the selected images?' %}');">
+				<input type="hidden" name="token" value="{{ token }}">
+				<input type="hidden" name="action" value="delete_images">
+				<div class="captcha-admin-gallery">
+					{% for img in c.images %}
+						<label class="captcha-admin-tile {% if img.is_target == 1 %}correct{% else %}wrong{% endif %}">
+							<input type="checkbox" name="ids[]" value="{{ img.id }}">
+							<img src="{{ img.image_url|e }}" alt="" loading="lazy">
+							<span class="ans">{% if img.is_target == 1 %}&#10003;{% else %}&#10007;{% endif %}</span>
+						</label>
+					{% endfor %}
+				</div>
+				<button type="submit" class="captcha-admin-delbtn">{% trans 'Delete selected' %}</button>
+				<span class="captcha-admin-hint unimportant">{% trans 'click images above to select them' %}</span>
+			</form>
+		{% else %}
+			<p class="captcha-admin-empty">{% trans 'No images yet — add some below.' %}</p>
+		{% endif %}
+
+		<div class="captcha-admin-adds">
+			<form action="?/captcha" method="post" class="captcha-admin-add">
+				<input type="hidden" name="token" value="{{ token }}">
+				<input type="hidden" name="action" value="add_images">
+				<input type="hidden" name="category" value="{{ c.name|e }}">
+				<input type="hidden" name="is_target" value="1">
+				<label><span class="ans-key correct">&#10003;</span> {% trans 'Add correct answers' %}</label>
+				<textarea name="urls" rows="2" placeholder="{% trans 'image URLs, one per line' %}"></textarea>
+				<label class="captcha-admin-mirror"><input type="checkbox" name="mirror" value="1" checked> {% trans 'copy onto server' %}</label>
+				<button type="submit">{% trans 'Add' %}</button>
+			</form>
+			<form action="?/captcha" method="post" class="captcha-admin-add">
+				<input type="hidden" name="token" value="{{ token }}">
+				<input type="hidden" name="action" value="add_images">
+				<input type="hidden" name="category" value="{{ c.name|e }}">
+				<input type="hidden" name="is_target" value="0">
+				<label><span class="ans-key wrong">&#10007;</span> {% trans 'Add decoys' %}</label>
+				<textarea name="urls" rows="2" placeholder="{% trans 'image URLs, one per line' %}"></textarea>
+				<label class="captcha-admin-mirror"><input type="checkbox" name="mirror" value="1" checked> {% trans 'copy onto server' %}</label>
+				<button type="submit">{% trans 'Add' %}</button>
+			</form>
 		</div>
 
 		<form action="?/captcha" method="post" style="margin:8px 0 0" onsubmit="return confirm('{% trans 'Delete this whole set?' %}');">
@@ -119,3 +112,24 @@
 		<button type="submit">{% trans 'Import' %}</button>
 	</form>
 </fieldset>
+
+<script>
+(function () {
+	function refresh(form) {
+		var btn = form.querySelector('.captcha-admin-delbtn');
+		if (btn) { btn.disabled = !form.querySelector('input[type=checkbox]:checked'); }
+	}
+	document.addEventListener('change', function (e) {
+		var cb = e.target;
+		if (!cb || !cb.matches || !cb.matches('.captcha-admin-tile input[type=checkbox]')) { return; }
+		var tile = cb.closest('.captcha-admin-tile');
+		if (tile) { tile.classList.toggle('selected', cb.checked); }
+		var form = cb.closest('form');
+		if (form) { refresh(form); }
+	});
+	document.addEventListener('DOMContentLoaded', function () {
+		var forms = document.querySelectorAll('.captcha-admin-delform');
+		for (var i = 0; i < forms.length; i++) { refresh(forms[i]); }
+	});
+})();
+</script>

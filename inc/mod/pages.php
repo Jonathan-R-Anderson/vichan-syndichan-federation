@@ -766,6 +766,21 @@ function mod_captcha(Context $ctx) {
 				modLog("Added $added captcha image(s) to " . $name);
 				break;
 
+			case 'delete_images':
+				// Bulk-delete the images the admin clicked to select in the gallery.
+				$ids = (isset($_POST['ids']) && is_array($_POST['ids'])) ? $_POST['ids'] : [];
+				$n = 0;
+				if (!empty($ids)) {
+					$del = prepare('DELETE FROM `captcha_grid_images` WHERE `id` = :id');
+					foreach ($ids as $id) {
+						$del->bindValue(':id', (int)$id, PDO::PARAM_INT);
+						$del->execute() or error(db_error($del));
+						$n += $del->rowCount();
+					}
+				}
+				modLog("Deleted $n captcha image(s)");
+				break;
+
 			case 'delete_set':
 				$name = trim($_POST['name'] ?? '');
 				$d = prepare('DELETE FROM `captcha_categories` WHERE `name` = :n');
@@ -854,23 +869,21 @@ function mod_captcha(Context $ctx) {
 		return;
 	}
 
-	// Load each set's images, split into matching / decoy, each with a delete token so the
-	// template can render them as thumbnails (at the exact captcha tile size) with a delete ×.
+	// Load each set's images into one compact gallery, correct answers first, with per-type
+	// counts. The template renders them as a click-to-select grid (green ✓ = correct answer,
+	// red ✗ = decoy); selected tiles are removed together via the delete_images action.
 	$categories = query('SELECT `name`, `prompt` FROM `captcha_categories` ORDER BY `name`') or error(db_error());
 	$categories = $categories->fetchAll(PDO::FETCH_ASSOC);
-	$imgq = prepare('SELECT `id`, `image_url`, `is_target` FROM `captcha_grid_images` WHERE `category` = :n ORDER BY `id`');
+	$imgq = prepare('SELECT `id`, `image_url`, `is_target` FROM `captcha_grid_images` WHERE `category` = :n ORDER BY `is_target` DESC, `id`');
 	foreach ($categories as &$c) {
 		$imgq->bindValue(':n', $c['name']);
 		$imgq->execute() or error(db_error($imgq));
-		$m = []; $d = [];
-		foreach ($imgq->fetchAll(PDO::FETCH_ASSOC) as $r) {
-			$r['delete_token'] = make_secure_link_token('captcha/delete/' . $r['id']);
-			if ($r['is_target']) { $m[] = $r; } else { $d[] = $r; }
+		$c['images'] = $imgq->fetchAll(PDO::FETCH_ASSOC);
+		$c['matching_count'] = 0;
+		$c['decoy_count'] = 0;
+		foreach ($c['images'] as $r) {
+			if ($r['is_target']) { $c['matching_count']++; } else { $c['decoy_count']++; }
 		}
-		$c['matching'] = $m;
-		$c['decoys'] = $d;
-		$c['matching_count'] = count($m);
-		$c['decoy_count'] = count($d);
 	}
 	unset($c);
 
