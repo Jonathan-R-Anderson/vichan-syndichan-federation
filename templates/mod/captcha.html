@@ -1,3 +1,30 @@
+<style>
+/* Inlined here (not in style.css) so it can't be defeated by stylesheet caching. The
+   !important sizing keeps thumbnails small even if a stale cached rule says otherwise. */
+.captcha-admin-legend { font-size: 12px; margin: 6px 0 2px; }
+.ans-key { display: inline-block; min-width: 15px; padding: 0 3px; text-align: center; color: #fff; font: bold 11px/15px sans-serif; border-radius: 2px; vertical-align: middle; }
+.ans-key.correct { background: #2a8a2a; }
+.ans-key.wrong { background: #b32020; }
+.captcha-admin-gallery { display: grid; grid-template-columns: repeat(auto-fill, 64px); gap: 5px; margin: 4px 0 6px; }
+.captcha-admin-tile { position: relative; width: 64px !important; height: 60px !important; box-sizing: border-box; border: 2px solid #ccc; cursor: pointer; display: block; line-height: 0; overflow: hidden; }
+.captcha-admin-tile img { width: 64px !important; height: 60px !important; max-width: 64px !important; object-fit: cover !important; display: block; user-select: none; -webkit-user-drag: none; }
+.captcha-admin-tile input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+.captcha-admin-tile.correct { border-color: #2a8a2a; }
+.captcha-admin-tile.wrong { border-color: #b32020; }
+.captcha-admin-tile .ans { position: absolute; left: 0; bottom: 0; z-index: 2; min-width: 14px; padding: 0 2px; text-align: center; color: #fff; font: bold 12px/14px sans-serif; }
+.captcha-admin-tile.correct .ans { background: #2a8a2a; }
+.captcha-admin-tile.wrong .ans { background: #b32020; }
+.captcha-admin-tile.selected { outline: 3px solid #1a6fd0; outline-offset: -1px; }
+.captcha-admin-tile.selected::before { content: ""; position: absolute; inset: 0; z-index: 1; background: rgba(26, 111, 208, 0.45); }
+.captcha-admin-hint { margin-left: 8px; font-size: 11px; }
+.captcha-admin-adds { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; }
+.captcha-admin-add { flex: 1; min-width: 240px; }
+.captcha-admin-add > label { font-size: 12px; display: block; margin-bottom: 2px; }
+.captcha-admin-add textarea { width: 100%; box-sizing: border-box; }
+.captcha-admin-mirror { font-size: 11px; }
+.captcha-admin-empty { color: #888; font-size: 12px; font-style: italic; margin: 4px 0; }
+</style>
+
 <p class="unimportant" style="text-align:center;word-wrap:break-word">
 	{% trans 'The "anime" captcha shows a grid of images and asks the poster to pick the ones matching a prompt. Each set below is one such challenge. A <span class="ans-key correct">&#10003;</span> marks a correct answer (the poster should select it); a <span class="ans-key wrong">&#10007;</span> marks a decoy. Click images to select them, then remove them with "Delete selected".' %}
 </p>
