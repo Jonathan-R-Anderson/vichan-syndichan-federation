@@ -10,8 +10,7 @@
     calls for thumbnailing have no tty — so an interactive shell strongly suggests hands-on
     access via a web-shell, an RCE payload, or a container breakout.
   condition: >
-    evt.type in (execve, execveat) and evt.dir = <
-    and container.id != host
+    evt.type in (execve, execveat)    and container.id != host
     and container.name startswith "vichan_"
     and proc.tty != 0
     and proc.name in (bash, sh, dash, ash, zsh, ksh, csh, tcsh)
@@ -28,8 +27,7 @@
     ahead of time and never install software at runtime, so this typically means an attacker is
     pulling in tools after gaining a foothold.
   condition: >
-    evt.type in (execve, execveat) and evt.dir = <
-    and container.id != host
+    evt.type in (execve, execveat)    and container.id != host
     and container.name startswith "vichan_"
     and proc.name in (apk, apt, apt-get, aptitude, dpkg, yum, dnf, rpm, pip, pip3, npm, gem, easy_install)
   output: >
@@ -43,8 +41,7 @@
     Something read a sensitive credential file inside a vichan container. Normal services never
     touch these, so a read is a strong indicator of reconnaissance after a compromise.
   condition: >
-    evt.type in (open, openat, openat2) and evt.dir = <
-    and container.id != host
+    evt.type in (open, openat, openat2)    and container.id != host
     and container.name startswith "vichan_"
     and fd.name in (/etc/shadow, /etc/sudoers, /root/.ssh/id_rsa, /root/.bash_history)
   output: >
@@ -59,7 +56,7 @@
     crypto-mining pools or reverse shells. Legitimate services here talk to db/redis/clamav on
     the internal network and to NNTP/HTTP(S) upstreams, not these.
   condition: >
-    evt.type = connect and evt.dir = < and fd.l4proto = tcp
+    evt.type = connect and fd.l4proto = tcp
     and container.id != host
     and container.name startswith "vichan_"
     and fd.sport != 0

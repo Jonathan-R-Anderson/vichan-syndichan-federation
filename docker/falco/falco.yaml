@@ -9,6 +9,20 @@ rules_files:
   - /etc/falco/falco_rules.local.yaml
   - /etc/falco/rules.d
 
+# Falco 0.41+ moved the container.* fields (container.name, container.image, …) out of the
+# core engine into the "container" plugin, and the default ruleset now REQUIRES it — without
+# this block Falco refuses to start ("Plugin requirement not satisfied: container"). The
+# plugin (libcontainer.so) ships in the image; its default "engines" auto-detect the runtime
+# socket, so the host docker socket mounted at /host/var/run/docker.sock is picked up (Falco
+# resolves it under HOST_ROOT=/host, set in compose.yml).
+load_plugins: [container]
+plugins:
+  - name: container
+    library_path: libcontainer.so
+    init_config:
+      label_max_len: 100
+      with_size: false
+
 # Use the modern, kernel-header-free eBPF probe.
 engine:
   kind: modern_ebpf

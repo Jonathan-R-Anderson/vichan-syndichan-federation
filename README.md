@@ -10,6 +10,13 @@ federated, multi-board site. It is a long-running fork of the (now defunct)
 [Tinyboard](http://github.com/savetheinternet/Tinyboard), with many additional
 features built on top.
 
+**This fork — federated-vichan — is built around three headline capabilities:**
+**[federated posting](#federated-posting)** over NNTPChan, so boards are shared across a
+network of independent nodes instead of being trapped on one server;
+**[real-time posting](#real-time-posting)**, so new threads and replies appear without a
+refresh; and a hardened **[security](#security)** stack, with upload malware scanning and
+runtime intrusion detection. **Federation is the heart of the project** — see below.
+
 - Written in PHP (8.1 supported), backed by MySQL/MariaDB.
 - Static page generation with pluggable caching (APCu, Memcached, or Redis).
 - Per-board configuration, a themeable front end, gettext translations, and a
@@ -57,6 +64,9 @@ features built on top.
 - **DNSBL** support (Tor/proxy blocklists), proxy detection, configurable flood
   throttling, unoriginal-content (robot) detection, a simple question/answer check,
   and optional **Tesseract OCR** text-in-image filtering.
+- **Upload malware scanning (ClamAV)** and **runtime intrusion detection (Falco)**, with
+  Falco alerts surfaced in the mod panel — see the dedicated **[Security](#security)**
+  section.
 
 ### Moderation
 - A full moderation panel with fine-grained, per-board and global **permissions**.
@@ -79,15 +89,18 @@ features built on top.
 - Search across posts, IP notes, bans, and the log; plus a recent-posts view.
 
 ### Federation
-- **NNTPChan** integration: federate boards over NNTP, exchanging threads, replies,
-  and images with peer nodes (best-effort broadcasting that never blocks local
-  posting).
+- **NNTPChan federation** — federated-vichan is a *federated* imageboard: boards are
+  shared across a network of independent nodes over NNTP, exchanging threads, replies, and
+  images with every peer that carries the board. A default public hub joins you to the
+  network at install time, and the whole layer is best-effort so it **never blocks local
+  posting**. **→ [Federated posting](#federated-posting)** covers this in depth.
 
 ### Front end & themes
 - Pluggable **themes** for site-wide pages: catalog, categories, recent posts, an
   overboard (ukko), RSS, sitemap, a public ban list, frameset, and a basic index.
 - A large set of optional JavaScript enhancements, including quick reply, inline
-  image expansion, post hovering/preview, auto-reload / live index, a thread watcher,
+  image expansion, post hovering/preview, **real-time updates** (live threads and index —
+  see [Real-time posting](#real-time-posting)), a thread watcher,
   catalog and catalog search, gallery view, thread/post hiding and filtering, ID
   colouring, quote selection, style selection, **user CSS/JS**, an options panel,
   favourites, and desktop-title notifications.
@@ -100,6 +113,137 @@ features built on top.
   4chan-compatible **JSON API**.
 - Internationalisation via gettext, a set of CLI maintenance tools, and Docker
   support.
+
+---
+
+## Federated posting
+
+**federated-vichan is a federated imageboard.** Instead of every post living on one server
+that can be seized, blocked, throttled, or simply go offline, boards are shared across a
+network of independent nodes that exchange content peer-to-peer over
+[NNTPChan](https://github.com/majestrate/nntpchan) — an imageboard federation protocol
+built on **NNTP**, the same battle-tested transport that has carried Usenet for decades.
+You are not hosting an island; you are joining a network.
+
+### How it works
+
+- **Every board maps to a newsgroup.** When someone posts a thread or reply, your node
+  publishes it as an NNTP article to that board's group. Any peer subscribed to the group
+  receives the article and renders it as a native post — thread, replies, and **images
+  included** (attachments are carried inline in the article, not just linked).
+- **Posts propagate outward.** A message posted on *your* node reaches every peer that
+  carries the group, and their peers in turn — so a single post can fan out across the
+  entire network with no central server relaying it.
+- **A default hub puts you online immediately.** A fresh install is pre-wired to the public
+  **syndichan.org** hub and automatically maps the `syndichan.random` newsgroup to your
+  **`/b/`** board, so a brand-new node starts **sending and receiving content the moment it
+  comes up** — no manual peering required to join the network.
+- **Message-ID deduplication.** Every article carries a globally-unique Message-ID, so the
+  same post arriving from two different peers is stored once; loops and duplicates are
+  dropped automatically.
+
+### Built to never get in your way
+
+Federation is **best-effort and asynchronous** — it is layered *on top of* local posting,
+never in front of it:
+
+- Local posting is **never blocked or slowed** by federation. If a peer or the hub is
+  unreachable, your post still succeeds instantly; outbound delivery is retried and inbound
+  sync catches up when the peer returns.
+- Outbound delivery is tuned for real-world endpoints (the syndichan.org hub accepts
+  articles by **POST** rather than streaming), so it works through the kind of restricted
+  NNTP hubs you actually meet in practice.
+
+### Managed from the mod panel
+
+An **NNTP manager** in the moderation panel puts the whole federation layer under admin
+control — no config-file editing:
+
+- **Peers** — add, remove, and enable/disable the nodes you pull from and push to.
+- **Group ↔ board map** — choose which newsgroups feed which local boards (many-to-many);
+  `/b/ ↔ syndichan.random` is seeded for you at install so the board self-populates.
+- **Settings** — federation identity and delivery options.
+
+### Why it matters
+
+A federated board has **no single point of failure and no single point of control.**
+Content is mirrored across every participating node, so:
+
+- if one node is taken down, the conversations live on everywhere else;
+- new nodes bootstrap from the network and immediately carry the shared corpus;
+- a community can run its own node, keep full control of its own instance, and *still* take
+  part in a much larger shared set of boards.
+
+That is what makes federated-vichan fundamentally different from a stock imageboard: it is
+a **resilient, distributed network of boards**, not a lone server.
+
+---
+
+## Real-time posting
+
+Boards update **live** — new threads appear on the index and new replies appear in an open
+thread **without anyone refreshing the page.** Two layers work together:
+
+- **Instant push (Server-Sent Events).** When a post is committed, the server bumps a
+  per-board change counter in **Redis**; a lightweight SSE endpoint streams that signal to
+  every connected browser, which then pulls in the new content — typically in well under a
+  second. SSE connections run in their **own dedicated PHP-FPM pool**, so a crowd of
+  long-lived streams can never starve normal page serving.
+- **Polling fallback.** If the stream drops, or the browser is old, the built-in
+  auto-reloader (open threads) and live-index (board index) keep updating on a short timer,
+  so the live experience **degrades gracefully instead of breaking**.
+
+Because boards are served as cached static HTML, front-end assets are **automatically
+cache-busted on every deploy** (versioned by content), so visitors always run the current
+scripts and styles rather than a stale cached copy.
+
+---
+
+## Security
+
+Running a public imageboard means accepting untrusted uploads and traffic from anyone.
+federated-vichan ships a defense-in-depth stack for exactly that. Full operational details
+are in [`docker/security.md`](docker/security.md).
+
+### Upload malware scanning (ClamAV)
+
+Every uploaded file is **streamed to a ClamAV daemon and scanned before the post is
+accepted** — a signature match rejects the post outright, so malware never reaches the
+board's storage or its visitors. Scanning happens over the network (clamd INSTREAM), so the
+scanner never needs access to the web server's filesystem. It **fails open** by default (a
+slow or offline scanner never blocks posting) and can be flipped to fail-closed for stricter
+environments.
+
+### Runtime threat detection (Falco)
+
+A [Falco](https://falco.org/) service watches host and container **syscalls** (via modern
+eBPF — no kernel headers required) for the tell-tale signs of a compromise: an interactive
+shell opening inside a container, a package manager running at runtime, reads of credential
+files, or connections to miner / reverse-shell ports. The rules are tuned to this stack so
+normal activity (thumbnailing, healthchecks) doesn't cry wolf. Alerts are written as JSON
+and surfaced **right in the mod panel at `?/falco`** — priority-coloured and newest-first —
+so staff can see what the host is doing without needing shell access to it.
+
+### Abuse prevention
+
+- **Captcha** — reCAPTCHA, hCaptcha, a self-hosted distorted-text captcha, or a self-hosted
+  **image-quiz captcha** whose answer key stays server-side.
+- **Perceptual image-hash banning** — fuzzy pHash/dHash/aHash matching catches re-encoded,
+  resized, or one-pixel-edited copies of a banned image.
+- A flexible **filter engine** (IP, file hash, name, filename, extension, body…), **DNSBL**
+  / proxy detection, flood throttling, robot detection, and optional **OCR** text-in-image
+  filtering.
+
+### Hardening
+
+- **Encrypted IP cloaking** — IPs are stored and shown to staff as reversible encrypted
+  tokens (including in the moderation log), so staff can act without handling raw addresses.
+- **EXIF stripping / image redraw** removes metadata — and metadata-borne exploits — from
+  uploads.
+- Optional **Content-Security-Policy**, secure / HTTPS-only cookies, **secure tripcodes**,
+  and **SSRF guards** on server-side fetches (upload-by-URL, captcha image import).
+- **Emergency mode** freezes a board into an approval queue so nothing from ordinary users
+  is published until staff clear it — a kill-switch for raids.
 
 ---
 
