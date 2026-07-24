@@ -24,12 +24,13 @@ To use it:
 - Load `js/anime-captcha.js` instead of `js/captcha.js` via `$config['additional_javascript']`.
 - Make sure `config.php` in this directory can reach vichan's database (see above).
 - Manage challenges from the mod panel at `?/captcha`:
-    - Add a **category** with a prompt.
-    - Add **images** to it, flagging each as a target (matches the prompt) or not; a
-      challenge mixes targets and non-targets. Or **import** a leomotors-style
-      CaptchaGetAll payload (paste the JSON, or fetch a `.../api/getall` URL) — categories,
-      images and the answer key are loaded — then **mirror** the remote images locally so
-      they do not rot or get hot-link-blocked.
+    - Create a **set** (a prompt plus its images).
+    - Add images by URL — one per line — as either **matching** images (the poster should
+      select these) or **decoy** images. Each is shown as a thumbnail at the exact size it
+      appears in the challenge and can be removed with a click. Tick "copy onto this server"
+      to mirror them locally so they do not rot or get hot-link-blocked.
+    - Optionally **bulk-import** a leomotors-style CaptchaGetAll payload from a
+      `.../api/getall` URL (its categories, images and answer key are loaded), then mirror.
 
 Tables (see `install.sql`): `captcha_categories` (name + prompt) and `captcha_grid_images`
 (category, image_url, is_target, label). The legacy `anime_captcha` table is unused.

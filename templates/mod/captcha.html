@@ -1,37 +1,82 @@
 <p class="unimportant" style="text-align:center;word-wrap:break-word">
-	{% trans 'The "anime" captcha is a grid: the user is shown a mix of images and must pick the ones matching a prompt. A "set" is one such challenge — a prompt, the images that match it, and decoy images that do not. Edit a set by pasting image URLs, one per line.' %}
+	{% trans 'The "anime" captcha is a grid: the user is shown a mix of images and must pick the ones matching a prompt. A "set" is one such challenge — a prompt, the matching images, and decoy images. Thumbnails are shown at the exact size they appear in the challenge; click × to remove one, or add more by URL.' %}
 </p>
 
 {% for c in categories %}
-	<fieldset>
+	<fieldset class="captcha-admin">
 		<legend>{{ c.name|e }}</legend>
-		<form action="?/captcha" method="post" style="margin:0">
+
+		<form action="?/captcha" method="post" style="margin:0 0 8px">
 			<input type="hidden" name="token" value="{{ token }}">
-			<input type="hidden" name="action" value="update_set">
+			<input type="hidden" name="action" value="update_prompt">
 			<input type="hidden" name="name" value="{{ c.name|e }}">
-			<p style="margin:0 0 6px">
-				<label>{% trans 'Prompt' %}:
-					<input type="text" name="prompt" size="40" value="{{ c.prompt|e }}" placeholder="{% trans 'e.g. Select all cats' %}">
-				</label>
-			</p>
-			<div style="display:flex;gap:12px;flex-wrap:wrap">
-				<div style="flex:1;min-width:220px">
-					<label><strong>{% trans 'Matching images' %}</strong> &mdash; {% trans 'users SHOULD select these' %} ({{ c.matching_count }})</label>
-					<textarea name="matching" rows="6" style="width:100%;box-sizing:border-box" placeholder="https://example.com/cat1.jpg">{{ c.matching|e }}</textarea>
-				</div>
-				<div style="flex:1;min-width:220px">
-					<label><strong>{% trans 'Decoy images' %}</strong> &mdash; {% trans 'users should NOT select these' %} ({{ c.decoy_count }})</label>
-					<textarea name="decoys" rows="6" style="width:100%;box-sizing:border-box" placeholder="https://example.com/dog1.jpg">{{ c.decoys|e }}</textarea>
-				</div>
-			</div>
-			<p class="unimportant" style="margin:4px 0">{% trans 'One image URL per line (http(s):// or a leading /). Updating replaces this set\'s images. Aim for at least 8 in each list.' %}</p>
-			<p style="margin:0"><button type="submit">{% trans 'Update set' %}</button></p>
+			<label>{% trans 'Prompt' %}:
+				<input type="text" name="prompt" size="40" value="{{ c.prompt|e }}" placeholder="{% trans 'e.g. Select all cats' %}">
+			</label>
+			<button type="submit">{% trans 'Save prompt' %}</button>
 		</form>
-		<form action="?/captcha" method="post" style="margin:4px 0 0" onsubmit="return confirm('{% trans 'Delete this whole set?' %}');">
+
+		<div class="captcha-admin-lists">
+			<div>
+				<label><strong>{% trans 'Matching images' %}</strong> &mdash; {% trans 'users SHOULD select these' %} ({{ c.matching_count }})</label>
+				{% if c.matching %}
+					<div class="grid-captcha">
+						<div class="grid-captcha-grid" style="grid-template-columns:repeat(4,1fr)">
+							{% for img in c.matching %}
+								<div class="grid-captcha-tile">
+									<img src="{{ img.image_url|e }}" alt="" loading="lazy">
+									<a class="thumb-del" href="?/captcha/delete/{{ img.id }}/{{ img.delete_token }}" title="{% trans 'Remove this image' %}" onclick="return confirm('{% trans 'Remove this image?' %}');">&times;</a>
+								</div>
+							{% endfor %}
+						</div>
+					</div>
+				{% else %}
+					<p class="captcha-admin-empty">{% trans 'None yet.' %}</p>
+				{% endif %}
+				<form action="?/captcha" method="post" style="margin:6px 0 0">
+					<input type="hidden" name="token" value="{{ token }}">
+					<input type="hidden" name="action" value="add_images">
+					<input type="hidden" name="category" value="{{ c.name|e }}">
+					<input type="hidden" name="is_target" value="1">
+					<textarea name="urls" rows="3" style="width:100%;box-sizing:border-box" placeholder="{% trans 'Add matching image URLs, one per line' %}"></textarea>
+					<label style="font-size:12px"><input type="checkbox" name="mirror" value="1" checked> {% trans 'copy onto this server' %}</label>
+					<button type="submit">{% trans 'Add matching' %}</button>
+				</form>
+			</div>
+
+			<div>
+				<label><strong>{% trans 'Decoy images' %}</strong> &mdash; {% trans 'users should NOT select these' %} ({{ c.decoy_count }})</label>
+				{% if c.decoys %}
+					<div class="grid-captcha">
+						<div class="grid-captcha-grid" style="grid-template-columns:repeat(4,1fr)">
+							{% for img in c.decoys %}
+								<div class="grid-captcha-tile">
+									<img src="{{ img.image_url|e }}" alt="" loading="lazy">
+									<a class="thumb-del" href="?/captcha/delete/{{ img.id }}/{{ img.delete_token }}" title="{% trans 'Remove this image' %}" onclick="return confirm('{% trans 'Remove this image?' %}');">&times;</a>
+								</div>
+							{% endfor %}
+						</div>
+					</div>
+				{% else %}
+					<p class="captcha-admin-empty">{% trans 'None yet.' %}</p>
+				{% endif %}
+				<form action="?/captcha" method="post" style="margin:6px 0 0">
+					<input type="hidden" name="token" value="{{ token }}">
+					<input type="hidden" name="action" value="add_images">
+					<input type="hidden" name="category" value="{{ c.name|e }}">
+					<input type="hidden" name="is_target" value="0">
+					<textarea name="urls" rows="3" style="width:100%;box-sizing:border-box" placeholder="{% trans 'Add decoy image URLs, one per line' %}"></textarea>
+					<label style="font-size:12px"><input type="checkbox" name="mirror" value="1" checked> {% trans 'copy onto this server' %}</label>
+					<button type="submit">{% trans 'Add decoys' %}</button>
+				</form>
+			</div>
+		</div>
+
+		<form action="?/captcha" method="post" style="margin:8px 0 0" onsubmit="return confirm('{% trans 'Delete this whole set?' %}');">
 			<input type="hidden" name="token" value="{{ token }}">
 			<input type="hidden" name="action" value="delete_set">
 			<input type="hidden" name="name" value="{{ c.name|e }}">
-			<button type="submit">{% trans 'Delete set' %}</button>
+			<button type="submit">{% trans 'Delete entire set' %}</button>
 		</form>
 	</fieldset>
 {% else %}

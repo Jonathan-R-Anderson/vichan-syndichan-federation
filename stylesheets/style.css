@@ -1320,3 +1320,24 @@ div.mix {
   border-radius: 2px;
 }
 .grid-captcha-error { color: #a00; font-size: 12px; }
+
+/* mod panel captcha editor: thumbnails reuse .grid-captcha-* above, so they render at the
+   exact tile size of a live challenge. Each tile gets a delete × overlay. */
+.captcha-admin-lists { display: flex; gap: 20px; flex-wrap: wrap; }
+.captcha-admin-lists > div { flex: 1; min-width: 260px; }
+.captcha-admin-lists .grid-captcha-tile { cursor: default; border-color: #ccc; }
+.captcha-admin-lists .thumb-del {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  padding: 0 5px;
+  line-height: 17px;
+  background: rgba(170, 0, 0, 0.85);
+  color: #fff;
+  font: bold 13px/17px sans-serif;
+  text-decoration: none;
+  border-radius: 0 0 0 3px;
+}
+.captcha-admin-lists .thumb-del:hover { background: #a00; }
+.captcha-admin-empty { color: #888; font-size: 12px; font-style: italic; margin: 2px 0; }

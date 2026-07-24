@@ -729,38 +729,41 @@ function mod_captcha(Context $ctx) {
 				modLog('Created captcha set ' . $name);
 				break;
 
-			case 'update_set':
+			case 'update_prompt':
 				$name = strtolower(preg_replace('/[^a-z0-9_.-]/i', '', trim($_POST['name'] ?? '')));
 				if ($name === '')
 					error(_('A set name is required.'));
-				$prompt = trim($_POST['prompt'] ?? '');
-				$matching = $parse_urls($_POST['matching'] ?? '');
-				$decoys = $parse_urls($_POST['decoys'] ?? '');
-
-				$q = prepare('INSERT INTO `captcha_categories` (`name`, `prompt`, `created_at`) VALUES (:n, :p, :t) ON DUPLICATE KEY UPDATE `prompt` = :p2');
+				$q = prepare('UPDATE `captcha_categories` SET `prompt` = :p WHERE `name` = :n');
+				$q->bindValue(':p', mb_substr(trim($_POST['prompt'] ?? ''), 0, 255));
 				$q->bindValue(':n', $name);
-				$q->bindValue(':p', mb_substr($prompt, 0, 255));
-				$q->bindValue(':p2', mb_substr($prompt, 0, 255));
-				$q->bindValue(':t', time());
 				$q->execute() or error(db_error($q));
+				modLog('Updated captcha prompt for ' . $name);
+				break;
 
-				// Replace the set's image pool with the two submitted URL lists.
-				$del = prepare('DELETE FROM `captcha_grid_images` WHERE `category` = :n');
-				$del->bindValue(':n', $name);
-				$del->execute() or error(db_error($del));
-
+			case 'add_images':
+				$name = strtolower(preg_replace('/[^a-z0-9_.-]/i', '', trim($_POST['category'] ?? '')));
+				$is_target = !empty($_POST['is_target']) ? 1 : 0;
+				$urls = $parse_urls($_POST['urls'] ?? '');
+				if ($name === '')
+					error(_('A set is required.'));
+				if (empty($urls))
+					error(_('Enter at least one image URL (one per line).'));
+				$mirror = isset($_POST['mirror']);
 				$ins = prepare("INSERT INTO `captcha_grid_images` (`category`, `image_url`, `is_target`, `label`, `created_at`) VALUES (:c, :u, :t, '', :ts)");
-				$now = time();
-				foreach ([[1, $matching], [0, $decoys]] as $group) {
-					foreach ($group[1] as $u) {
-						$ins->bindValue(':c', $name);
-						$ins->bindValue(':u', $u);
-						$ins->bindValue(':t', $group[0], PDO::PARAM_INT);
-						$ins->bindValue(':ts', $now);
-						$ins->execute() or error(db_error($ins));
+				$added = 0;
+				foreach ($urls as $u) {
+					if ($mirror && preg_match('#^https?://#i', $u)) {
+						$local = captcha_mirror_image($u, $grid_image_dir);
+						if ($local !== false) $u = $local;
 					}
+					$ins->bindValue(':c', $name);
+					$ins->bindValue(':u', $u);
+					$ins->bindValue(':t', $is_target, PDO::PARAM_INT);
+					$ins->bindValue(':ts', time());
+					$ins->execute() or error(db_error($ins));
+					$added++;
 				}
-				modLog('Updated captcha set ' . $name . ' (' . count($matching) . ' matching, ' . count($decoys) . ' decoy)');
+				modLog("Added $added captcha image(s) to " . $name);
 				break;
 
 			case 'delete_set':
@@ -851,19 +854,21 @@ function mod_captcha(Context $ctx) {
 		return;
 	}
 
-	// Load each set with its matching / decoy image URLs (one per line) for the edit forms.
+	// Load each set's images, split into matching / decoy, each with a delete token so the
+	// template can render them as thumbnails (at the exact captcha tile size) with a delete ×.
 	$categories = query('SELECT `name`, `prompt` FROM `captcha_categories` ORDER BY `name`') or error(db_error());
 	$categories = $categories->fetchAll(PDO::FETCH_ASSOC);
-	$imgq = prepare('SELECT `image_url`, `is_target` FROM `captcha_grid_images` WHERE `category` = :n ORDER BY `id`');
+	$imgq = prepare('SELECT `id`, `image_url`, `is_target` FROM `captcha_grid_images` WHERE `category` = :n ORDER BY `id`');
 	foreach ($categories as &$c) {
 		$imgq->bindValue(':n', $c['name']);
 		$imgq->execute() or error(db_error($imgq));
 		$m = []; $d = [];
 		foreach ($imgq->fetchAll(PDO::FETCH_ASSOC) as $r) {
-			if ($r['is_target']) { $m[] = $r['image_url']; } else { $d[] = $r['image_url']; }
+			$r['delete_token'] = make_secure_link_token('captcha/delete/' . $r['id']);
+			if ($r['is_target']) { $m[] = $r; } else { $d[] = $r; }
 		}
-		$c['matching'] = implode("\n", $m);
-		$c['decoys'] = implode("\n", $d);
+		$c['matching'] = $m;
+		$c['decoys'] = $d;
 		$c['matching_count'] = count($m);
 		$c['decoy_count'] = count($d);
 	}
